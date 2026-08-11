@@ -290,6 +290,11 @@ label {
   color: var(--pending);
 }
 
+.badge-running {
+  background: #e3edfb;
+  color: var(--accent);
+}
+
 .row-actions {
   white-space: nowrap;
 }
@@ -354,6 +359,10 @@ label {
 
   .badge-pending {
     background: #4a3a12;
+  }
+
+  .badge-running {
+    background: #1e2f4a;
   }
 }
 

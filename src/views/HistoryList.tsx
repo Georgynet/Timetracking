@@ -82,14 +82,24 @@ export function HistoryList({ tasks, refreshSignal, onEntriesChanged }: HistoryL
                 <td>{formatDuration(entry.durationSeconds)}</td>
                 <td className="comment-cell">{entry.comment ?? ""}</td>
                 <td>
-                  <span className={entry.isSynced ? "badge badge-synced" : "badge badge-pending"}>
-                    {entry.isSynced ? "Synced" : "Pending"}
+                  <span
+                    className={
+                      entry.endedAt === null
+                        ? "badge badge-running"
+                        : entry.isSynced
+                          ? "badge badge-synced"
+                          : "badge badge-pending"
+                    }
+                  >
+                    {entry.endedAt === null ? "Running" : entry.isSynced ? "Synced" : "Pending"}
                   </span>
                 </td>
                 <td className="row-actions">
-                  <button className="link-button" onClick={() => setEditingEntry(entry)}>
-                    Edit
-                  </button>
+                  {entry.endedAt !== null && (
+                    <button className="link-button" onClick={() => setEditingEntry(entry)}>
+                      Edit
+                    </button>
+                  )}
                   {canDelete(entry) && (
                     <button className="link-button" onClick={() => handleDelete(entry.id)}>
                       Delete

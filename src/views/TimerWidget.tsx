@@ -21,6 +21,7 @@ export function TimerWidget({ activeTimer, tasks, onStart, onStop }: TimerWidget
   const [selectedTaskId, setSelectedTaskId] = useState<number | "">("");
   const [comment, setComment] = useState("");
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!activeTimer) return;
@@ -31,9 +32,12 @@ export function TimerWidget({ activeTimer, tasks, onStart, onStop }: TimerWidget
   async function handleStart() {
     if (selectedTaskId === "") return;
     setBusy(true);
+    setError(null);
     try {
       await onStart(selectedTaskId, comment.trim() || undefined);
       setComment("");
+    } catch (err) {
+      setError(err as string);
     } finally {
       setBusy(false);
     }
@@ -41,8 +45,11 @@ export function TimerWidget({ activeTimer, tasks, onStart, onStop }: TimerWidget
 
   async function handleStop() {
     setBusy(true);
+    setError(null);
     try {
       await onStop();
+    } catch (err) {
+      setError(err as string);
     } finally {
       setBusy(false);
     }
@@ -52,6 +59,7 @@ export function TimerWidget({ activeTimer, tasks, onStart, onStop }: TimerWidget
     const elapsedSeconds = Math.max(0, (now - new Date(activeTimer.startedAt).getTime()) / 1000);
     return (
       <section className="timer-widget timer-running">
+        {error && <p className="error">{error}</p>}
         {activeTimer.isStale && (
           <p className="stale-banner">
             This timer has been running a long time — still working on it, or forgot to
@@ -71,6 +79,7 @@ export function TimerWidget({ activeTimer, tasks, onStart, onStop }: TimerWidget
 
   return (
     <section className="timer-widget">
+      {error && <p className="error">{error}</p>}
       <select value={selectedTaskId} onChange={(e) => setSelectedTaskId(Number(e.target.value) || "")}>
         <option value="">Select a ticket…</option>
         {tasks.map((t) => (

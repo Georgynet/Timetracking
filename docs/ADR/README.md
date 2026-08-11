@@ -22,3 +22,4 @@ it instead, so the history of *why* stays intact.
 | [0010](0010-programmatic-tray-with-linux-fallback.md) | Build the system tray programmatically with a window-only fallback for Linux | Accepted |
 | [0011](0011-log-safety-by-construction.md) | Guarantee log safety by construction, not a redaction layer | Accepted |
 | [0012](0012-separate-command-impl-from-tauri-command-wrappers.md) | Separate pure command-impl functions from `#[tauri::command]` wrappers for testability | Accepted |
+| [0013](0013-running-timer-not-editable-outside-start-stop.md) | The running timer cannot be edited or deleted outside start/stop | Accepted |
