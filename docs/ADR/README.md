@@ -24,3 +24,5 @@ it instead, so the history of *why* stays intact.
 | [0012](0012-separate-command-impl-from-tauri-command-wrappers.md) | Separate pure command-impl functions from `#[tauri::command]` wrappers for testability | Accepted |
 | [0013](0013-running-timer-not-editable-outside-start-stop.md) | The running timer cannot be edited or deleted outside start/stop | Accepted |
 | [0014](0014-sync-status-gates-edit-and-delete.md) | Sync status gates edit/delete: unsynced is fully mutable, synced is permanent | Accepted |
+| [0015](0015-task-summary-denormalized-onto-time-entry.md) | Denormalize the ticket summary onto `TimeEntry` for the history tooltip | Accepted |
+| [0016](0016-jira-links-via-opener-plugin.md) | Link tickets to Jira via the `opener` plugin, not plain anchor navigation | Accepted |

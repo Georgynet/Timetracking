@@ -8,6 +8,7 @@ fn row_to_time_entry(row: &Row) -> rusqlite::Result<TimeEntry> {
         id: row.get("id")?,
         task_id: row.get("task_id")?,
         task_key: row.get("jira_key")?,
+        task_summary: row.get("summary")?,
         started_at: row.get("started_at")?,
         ended_at: row.get("ended_at")?,
         duration_seconds: row.get("duration_seconds")?,
@@ -19,7 +20,7 @@ fn row_to_time_entry(row: &Row) -> rusqlite::Result<TimeEntry> {
     })
 }
 
-const SELECT_JOIN: &str = "SELECT time_entries.*, tasks.jira_key FROM time_entries \
+const SELECT_JOIN: &str = "SELECT time_entries.*, tasks.jira_key, tasks.summary FROM time_entries \
      JOIN tasks ON tasks.id = time_entries.task_id";
 
 pub fn get_by_id(conn: &Connection, id: i64) -> rusqlite::Result<Option<TimeEntry>> {

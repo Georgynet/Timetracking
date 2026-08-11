@@ -11,6 +11,7 @@ export interface TimeEntry {
   id: number;
   taskId: number;
   taskKey: string;
+  taskSummary: string;
   startedAt: string;
   endedAt: string | null;
   durationSeconds: number | null;

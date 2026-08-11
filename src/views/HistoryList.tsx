@@ -1,7 +1,9 @@
 import { confirm } from "@tauri-apps/plugin-dialog";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { useEffect, useState } from "react";
 import { deleteDraftEntry, listTimeEntries } from "../api/commands";
 import type { Task, TimeEntry } from "../api/types";
+import { jiraIssueUrl } from "../lib/jira";
 import { ManualEntryForm } from "./ManualEntryForm";
 
 function formatDuration(seconds: number | null): string {
@@ -21,11 +23,12 @@ function canDelete(entry: TimeEntry): boolean {
 
 interface HistoryListProps {
   tasks: Task[];
+  jiraBaseUrl: string;
   refreshSignal: number;
   onEntriesChanged: () => Promise<void>;
 }
 
-export function HistoryList({ tasks, refreshSignal, onEntriesChanged }: HistoryListProps) {
+export function HistoryList({ tasks, jiraBaseUrl, refreshSignal, onEntriesChanged }: HistoryListProps) {
   const [entries, setEntries] = useState<TimeEntry[]>([]);
   const [editingEntry, setEditingEntry] = useState<TimeEntry | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
@@ -87,7 +90,19 @@ export function HistoryList({ tasks, refreshSignal, onEntriesChanged }: HistoryL
           <tbody>
             {entries.map((entry) => (
               <tr key={entry.id}>
-                <td>{entry.taskKey}</td>
+                <td>
+                  <a
+                    className="jira-link"
+                    title={entry.taskSummary}
+                    href={jiraIssueUrl(jiraBaseUrl, entry.taskKey)}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      openUrl(jiraIssueUrl(jiraBaseUrl, entry.taskKey));
+                    }}
+                  >
+                    {entry.taskKey}
+                  </a>
+                </td>
                 <td>{new Date(entry.startedAt).toLocaleString()}</td>
                 <td>{formatDuration(entry.durationSeconds)}</td>
                 <td className="comment-cell">{entry.comment ?? ""}</td>
