@@ -15,7 +15,7 @@ Use the **`keyring`** crate (v4, its `v1`-compatible `Entry` API) with the
 default features cover Windows and Linux (via `zbus-secret-service-keyring-store`) but
 *not* Apple's native backend, so it must be turned on explicitly for this app's
 primary platform. `SERVICE_NAME` in `secrets/keyring_store.rs` matches
-`tauri.conf.json`'s `identifier` (`com.georg.timetracing`) to namespace the entry to
+`tauri.conf.json`'s `identifier` (`com.georg.timetracking`) to namespace the entry to
 this app.
 
 The `settings` SQLite table holds only `jira_base_url`/`jira_email` (needed at startup

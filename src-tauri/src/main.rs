@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    timetracing_lib::run()
+    timetracking_lib::run()
 }

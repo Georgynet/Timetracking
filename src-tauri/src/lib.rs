@@ -31,7 +31,7 @@ pub fn run() {
                 .app_data_dir()
                 .expect("app data dir should be resolvable");
             std::fs::create_dir_all(&app_dir).expect("could not create app data directory");
-            let db_path = app_dir.join("timetracing.sqlite3");
+            let db_path = app_dir.join("timetracking.sqlite3");
             let conn = db::connection::open_app_db(&db_path).expect("failed to open/migrate database");
 
             let state = AppState::new(conn);

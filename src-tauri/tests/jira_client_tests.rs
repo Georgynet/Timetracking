@@ -6,9 +6,9 @@
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use chrono::{TimeZone, Utc};
 use serde_json::json;
-use timetracing_lib::jira::client_trait::JiraClient;
-use timetracing_lib::jira::models::JiraError;
-use timetracing_lib::jira::reqwest_client::ReqwestJiraClient;
+use timetracking_lib::jira::client_trait::JiraClient;
+use timetracking_lib::jira::models::JiraError;
+use timetracking_lib::jira::reqwest_client::ReqwestJiraClient;
 use wiremock::matchers::{body_json, header, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 

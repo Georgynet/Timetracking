@@ -2,7 +2,7 @@ use keyring::Entry;
 
 /// Must match `tauri.conf.json`'s `identifier` — keeps the keychain entry namespaced
 /// to this app specifically.
-const SERVICE_NAME: &str = "com.georg.timetracing";
+const SERVICE_NAME: &str = "com.georg.timetracking";
 const KEYCHAIN_USERNAME: &str = "jira_api_token";
 
 #[derive(Debug, thiserror::Error)]

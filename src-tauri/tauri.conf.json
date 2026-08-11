@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "timetracing",
+  "productName": "timetracking",
   "version": "0.1.0",
-  "identifier": "com.georg.timetracing",
+  "identifier": "com.georg.timetracking",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
