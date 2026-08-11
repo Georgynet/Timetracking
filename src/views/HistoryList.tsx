@@ -1,3 +1,4 @@
+import { confirm } from "@tauri-apps/plugin-dialog";
 import { useEffect, useState } from "react";
 import { deleteDraftEntry, listTimeEntries } from "../api/commands";
 import type { Task, TimeEntry } from "../api/types";
@@ -10,8 +11,12 @@ function formatDuration(seconds: number | null): string {
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
+function canEdit(entry: TimeEntry): boolean {
+  return entry.endedAt !== null && !entry.isSynced;
+}
+
 function canDelete(entry: TimeEntry): boolean {
-  return entry.createdManually && !entry.isSynced && entry.jiraWorklogId === null;
+  return entry.endedAt !== null && !entry.isSynced && entry.jiraWorklogId === null;
 }
 
 interface HistoryListProps {
@@ -39,10 +44,15 @@ export function HistoryList({ tasks, refreshSignal, onEntriesChanged }: HistoryL
   }, [refreshSignal]);
 
   async function handleDelete(id: number) {
-    if (!confirm("Delete this entry? This cannot be undone.")) return;
+    const confirmed = await confirm("Delete this entry? This cannot be undone.", {
+      title: "Delete time entry",
+      kind: "warning",
+    });
+    if (!confirmed) return;
     try {
       await deleteDraftEntry(id);
       await reload();
+      await onEntriesChanged();
     } catch (err) {
       setError(err as string);
     }
@@ -95,7 +105,7 @@ export function HistoryList({ tasks, refreshSignal, onEntriesChanged }: HistoryL
                   </span>
                 </td>
                 <td className="row-actions">
-                  {entry.endedAt !== null && (
+                  {canEdit(entry) && (
                     <button className="link-button" onClick={() => setEditingEntry(entry)}>
                       Edit
                     </button>
