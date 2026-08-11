@@ -1,0 +1,77 @@
+import { create } from "zustand";
+import * as api from "../api/commands";
+import type { ActiveTimer, SettingsDto, SyncReport, Task } from "../api/types";
+
+interface AppStore {
+  settings: SettingsDto | null;
+  myTasks: Task[];
+  favoriteTasks: Task[];
+  activeTimer: ActiveTimer | null;
+  unsyncedCount: number;
+  lastSyncReport: SyncReport | null;
+  loading: boolean;
+
+  loadSettings: () => Promise<void>;
+  loadTasks: () => Promise<void>;
+  refreshMyTasks: () => Promise<void>;
+  loadActiveTimer: () => Promise<void>;
+  loadUnsyncedCount: () => Promise<void>;
+  startTimer: (taskId: number, comment?: string) => Promise<void>;
+  stopTimer: () => Promise<void>;
+  runSync: () => Promise<SyncReport>;
+}
+
+export const useStore = create<AppStore>((set, get) => ({
+  settings: null,
+  myTasks: [],
+  favoriteTasks: [],
+  activeTimer: null,
+  unsyncedCount: 0,
+  lastSyncReport: null,
+  loading: true,
+
+  loadSettings: async () => {
+    const settings = await api.getSettings();
+    set({ settings, loading: false });
+  },
+
+  loadTasks: async () => {
+    const [myTasks, favoriteTasks] = await Promise.all([
+      api.listMyTasks(),
+      api.listFavoriteTasks(),
+    ]);
+    set({ myTasks, favoriteTasks });
+  },
+
+  refreshMyTasks: async () => {
+    const myTasks = await api.refreshMyTasks();
+    set({ myTasks });
+  },
+
+  loadActiveTimer: async () => {
+    const activeTimer = await api.getActiveTimer();
+    set({ activeTimer });
+  },
+
+  loadUnsyncedCount: async () => {
+    const unsyncedCount = await api.listUnsyncedCount();
+    set({ unsyncedCount });
+  },
+
+  startTimer: async (taskId, comment) => {
+    await api.startTimer(taskId, comment);
+    await get().loadActiveTimer();
+  },
+
+  stopTimer: async () => {
+    await api.stopTimer();
+    await Promise.all([get().loadActiveTimer(), get().loadUnsyncedCount()]);
+  },
+
+  runSync: async () => {
+    const report = await api.syncAll();
+    set({ lastSyncReport: report });
+    await get().loadUnsyncedCount();
+    return report;
+  },
+}));
