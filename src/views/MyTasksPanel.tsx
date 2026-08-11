@@ -1,13 +1,16 @@
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { useState } from "react";
 import type { Task } from "../api/types";
+import { jiraIssueUrl } from "../lib/jira";
 
 interface MyTasksPanelProps {
   tasks: Task[];
+  jiraBaseUrl: string;
   onRefresh: () => Promise<void>;
   onStartTimer: (taskId: number) => Promise<void>;
 }
 
-export function MyTasksPanel({ tasks, onRefresh, onStartTimer }: MyTasksPanelProps) {
+export function MyTasksPanel({ tasks, jiraBaseUrl, onRefresh, onStartTimer }: MyTasksPanelProps) {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,7 +41,16 @@ export function MyTasksPanel({ tasks, onRefresh, onStartTimer }: MyTasksPanelPro
         <ul className="task-list">
           {tasks.map((t) => (
             <li key={t.id}>
-              <span className="task-key">{t.jiraKey}</span>
+              <a
+                className="task-key jira-link"
+                href={jiraIssueUrl(jiraBaseUrl, t.jiraKey)}
+                onClick={(e) => {
+                  e.preventDefault();
+                  openUrl(jiraIssueUrl(jiraBaseUrl, t.jiraKey));
+                }}
+              >
+                {t.jiraKey}
+              </a>
               <span className="task-summary">{t.summary}</span>
               <button onClick={() => onStartTimer(t.id)}>Start</button>
             </li>

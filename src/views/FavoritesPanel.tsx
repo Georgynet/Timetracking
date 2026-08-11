@@ -1,14 +1,17 @@
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { useState } from "react";
 import { addFavoriteByKey, removeFavorite, searchJiraIssues } from "../api/commands";
 import type { JiraIssue, Task } from "../api/types";
+import { jiraIssueUrl } from "../lib/jira";
 
 interface FavoritesPanelProps {
   tasks: Task[];
+  jiraBaseUrl: string;
   onChanged: () => Promise<void>;
   onStartTimer: (taskId: number) => Promise<void>;
 }
 
-export function FavoritesPanel({ tasks, onChanged, onStartTimer }: FavoritesPanelProps) {
+export function FavoritesPanel({ tasks, jiraBaseUrl, onChanged, onStartTimer }: FavoritesPanelProps) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<JiraIssue[]>([]);
   const [searching, setSearching] = useState(false);
@@ -80,7 +83,16 @@ export function FavoritesPanel({ tasks, onChanged, onStartTimer }: FavoritesPane
         <ul className="task-list">
           {tasks.map((t) => (
             <li key={t.id}>
-              <span className="task-key">{t.jiraKey}</span>
+              <a
+                className="task-key jira-link"
+                href={jiraIssueUrl(jiraBaseUrl, t.jiraKey)}
+                onClick={(e) => {
+                  e.preventDefault();
+                  openUrl(jiraIssueUrl(jiraBaseUrl, t.jiraKey));
+                }}
+              >
+                {t.jiraKey}
+              </a>
               <span className="task-summary">{t.summary}</span>
               <button onClick={() => onStartTimer(t.id)}>Start</button>
               <button className="link-button" onClick={() => handleRemove(t.id)}>

@@ -60,7 +60,7 @@ export function MainView({ onReconfigure }: { onReconfigure: () => void }) {
     await Promise.all([loadActiveTimer(), loadUnsyncedCount()]);
   }
 
-  if (!settings) return null;
+  if (!settings || !settings.jiraBaseUrl) return null;
 
   // Favorites and "my tasks" can overlap (e.g. a favorited ticket that's also
   // assigned to you) — de-dupe by id for the timer's ticket picker and history form.
@@ -82,10 +82,25 @@ export function MainView({ onReconfigure }: { onReconfigure: () => void }) {
         onStop={handleStopTimer}
       />
       <div className="panels-row">
-        <MyTasksPanel tasks={myTasks} onRefresh={refreshMyTasks} onStartTimer={handleStartTimer} />
-        <FavoritesPanel tasks={favoriteTasks} onChanged={loadTasks} onStartTimer={handleStartTimer} />
+        <MyTasksPanel
+          tasks={myTasks}
+          jiraBaseUrl={settings.jiraBaseUrl}
+          onRefresh={refreshMyTasks}
+          onStartTimer={handleStartTimer}
+        />
+        <FavoritesPanel
+          tasks={favoriteTasks}
+          jiraBaseUrl={settings.jiraBaseUrl}
+          onChanged={loadTasks}
+          onStartTimer={handleStartTimer}
+        />
       </div>
-      <HistoryList tasks={allTasks} refreshSignal={historyRefreshSignal} onEntriesChanged={handleEntriesChanged} />
+      <HistoryList
+        tasks={allTasks}
+        jiraBaseUrl={settings.jiraBaseUrl}
+        refreshSignal={historyRefreshSignal}
+        onEntriesChanged={handleEntriesChanged}
+      />
       {syncReport && <SyncReportModal report={syncReport} onClose={() => setSyncReport(null)} />}
     </div>
   );

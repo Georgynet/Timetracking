@@ -18,6 +18,7 @@ pub struct TimeEntry {
     pub id: i64,
     pub task_id: i64,
     pub task_key: String,
+    pub task_summary: String,
     pub started_at: DateTime<Utc>,
     pub ended_at: Option<DateTime<Utc>>,
     pub duration_seconds: Option<i64>,
