@@ -23,3 +23,4 @@ it instead, so the history of *why* stays intact.
 | [0011](0011-log-safety-by-construction.md) | Guarantee log safety by construction, not a redaction layer | Accepted |
 | [0012](0012-separate-command-impl-from-tauri-command-wrappers.md) | Separate pure command-impl functions from `#[tauri::command]` wrappers for testability | Accepted |
 | [0013](0013-running-timer-not-editable-outside-start-stop.md) | The running timer cannot be edited or deleted outside start/stop | Accepted |
+| [0014](0014-sync-status-gates-edit-and-delete.md) | Sync status gates edit/delete: unsynced is fully mutable, synced is permanent | Accepted |

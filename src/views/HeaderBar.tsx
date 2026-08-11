@@ -1,3 +1,4 @@
+import { confirm } from "@tauri-apps/plugin-dialog";
 import { useState } from "react";
 import { clearJiraSettings } from "../api/commands";
 import type { SettingsDto, SyncReport } from "../api/types";
@@ -27,7 +28,11 @@ export function HeaderBar({ settings, unsyncedCount, trayAvailable, onSync, onRe
   }
 
   async function handleReconfigure() {
-    if (!confirm("Disconnect from Jira and re-enter your credentials?")) return;
+    const confirmed = await confirm("Disconnect from Jira and re-enter your credentials?", {
+      title: "Reconfigure Jira",
+      kind: "warning",
+    });
+    if (!confirmed) return;
     await clearJiraSettings();
     onReconfigure();
   }

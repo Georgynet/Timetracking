@@ -79,6 +79,12 @@ pub fn create_manual_entry(
 /// with the start). An explicit `ended_at` always wins over `duration_seconds` when
 /// both are given.
 ///
+/// Only a pending (`is_synced = false`), completed entry can be edited — the running
+/// timer's lifecycle belongs exclusively to `timer::engine` (see ADR-0013), and once
+/// an entry has been synced it's treated as a permanent record matching Jira: fixing
+/// a mistake in a synced entry has to happen in Jira itself, not by editing the local
+/// copy back out of sync with it.
+///
 /// `comment` is a plain `Option<String>`, not the "does this JSON key round-trip
 /// `null` vs missing" double-option shape: `None` means "leave the comment
 /// unchanged", `Some("")` clears it, `Some(text)` sets it. A nested
@@ -99,6 +105,11 @@ fn update_time_entry_impl(
     if current.is_running() {
         return Err(AppError::Validation(
             "Cannot edit the currently running timer — stop it first.".into(),
+        ));
+    }
+    if current.is_synced {
+        return Err(AppError::Validation(
+            "Cannot edit an entry that has already been synced to Jira.".into(),
         ));
     }
 
@@ -160,16 +171,25 @@ pub fn list_time_entries(
     Ok(time_entries_repo::list_entries(&conn, task_id, from, to)?)
 }
 
-/// Hard-deletes an entry — but only ever a manual entry that has never touched Jira.
-/// Everything else (timer-created, or ever synced) is permanent per the spec's "never
-/// deleted" rule; this only exists to fix a fat-fingered manual entry.
+/// Hard-deletes an entry — any completed, never-synced entry, whether it was
+/// created manually or via the timer. Once an entry has been synced (or ever carried
+/// a `jira_worklog_id`, even if a since-blocked edit path could otherwise have reset
+/// `is_synced` back to false — see ADR-0013/0007) it's permanent, matching the spec's
+/// "never deleted" rule for anything that ever reached Jira. The running timer can
+/// never be deleted through this path either — its lifecycle belongs to
+/// `timer::engine` alone.
 fn delete_draft_entry_impl(state: &AppState, id: i64) -> AppResult<()> {
     let conn = state.db.lock().unwrap();
     let entry = time_entries_repo::get_by_id(&conn, id)?
         .ok_or_else(|| AppError::NotFound(format!("No time entry with id {id}")))?;
-    if !entry.created_manually || entry.is_synced || entry.jira_worklog_id.is_some() {
+    if entry.is_running() {
         return Err(AppError::Validation(
-            "Only a manual entry that has never been synced can be deleted.".into(),
+            "Cannot delete the currently running timer — stop it first.".into(),
+        ));
+    }
+    if entry.is_synced || entry.jira_worklog_id.is_some() {
+        return Err(AppError::Validation(
+            "Only entries that have never been synced to Jira can be deleted.".into(),
         ));
     }
     time_entries_repo::delete_draft(&conn, id)?;
@@ -259,6 +279,23 @@ mod tests {
     }
 
     #[test]
+    fn editing_a_synced_entry_is_rejected() {
+        let (state, task_id) = setup();
+        let entry = create_manual_entry_impl(&state, task_id, now().to_rfc3339(), None, Some(60), None).unwrap();
+        {
+            let conn = state.db.lock().unwrap();
+            time_entries_repo::mark_synced(&conn, entry.id, "wl-1").unwrap();
+        }
+
+        let result = update_time_entry_impl(&state, entry.id, None, None, None, Some(120), None);
+
+        assert!(result.is_err(), "a synced entry must never be editable");
+        let conn = state.db.lock().unwrap();
+        let reloaded = time_entries_repo::get_by_id(&conn, entry.id).unwrap().unwrap();
+        assert_eq!(reloaded.duration_seconds, Some(60), "the rejected edit must not have applied");
+    }
+
+    #[test]
     fn delete_is_rejected_once_synced() {
         let (state, task_id) = setup();
         let entry = create_manual_entry_impl(&state, task_id, now().to_rfc3339(), None, Some(60), None).unwrap();
@@ -268,6 +305,40 @@ mod tests {
         }
         let result = delete_draft_entry_impl(&state, entry.id);
         assert!(result.is_err(), "a synced entry must never be hard-deleted");
+    }
+
+    #[test]
+    fn delete_is_rejected_for_the_running_timer() {
+        let (state, task_id) = setup();
+        let running = {
+            let conn = state.db.lock().unwrap();
+            time_entries_repo::insert_running(&conn, task_id, now(), None).unwrap()
+        };
+
+        let result = delete_draft_entry_impl(&state, running.id);
+
+        assert!(result.is_err(), "the running timer must never be deletable");
+        let conn = state.db.lock().unwrap();
+        assert!(time_entries_repo::get_by_id(&conn, running.id).unwrap().is_some());
+    }
+
+    #[test]
+    fn delete_succeeds_for_an_unsynced_timer_created_entry() {
+        let (state, task_id) = setup();
+        let entry_id = {
+            let conn = state.db.lock().unwrap();
+            let running = time_entries_repo::insert_running(&conn, task_id, now(), None).unwrap();
+            time_entries_repo::stop_running(&conn, running.id, now() + Duration::minutes(10), 600).unwrap();
+            running.id
+        };
+
+        delete_draft_entry_impl(&state, entry_id).unwrap();
+
+        let conn = state.db.lock().unwrap();
+        assert!(
+            time_entries_repo::get_by_id(&conn, entry_id).unwrap().is_none(),
+            "an unsynced entry must be deletable regardless of whether it came from the timer or a manual entry"
+        );
     }
 
     #[test]
