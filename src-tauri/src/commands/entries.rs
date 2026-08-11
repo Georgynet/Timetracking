@@ -96,6 +96,11 @@ fn update_time_entry_impl(
     let conn = state.db.lock().unwrap();
     let current = time_entries_repo::get_by_id(&conn, id)?
         .ok_or_else(|| AppError::NotFound(format!("No time entry with id {id}")))?;
+    if current.is_running() {
+        return Err(AppError::Validation(
+            "Cannot edit the currently running timer — stop it first.".into(),
+        ));
+    }
 
     let new_started_at = started_at.map(|s| parse_dt(&s)).transpose()?;
     let new_ended_at = ended_at.map(|s| parse_dt(&s)).transpose()?;
@@ -191,6 +196,30 @@ mod tests {
         let conn = open_in_memory().unwrap();
         let task_id = tasks_repo::upsert_favorite_task(&conn, "PROJ-1", "Ticket", now()).unwrap().id;
         (AppState::new(conn), task_id)
+    }
+
+    #[test]
+    fn editing_the_running_timer_is_rejected() {
+        let (state, task_id) = setup();
+        let running = {
+            let conn = state.db.lock().unwrap();
+            time_entries_repo::insert_running(&conn, task_id, now(), None).unwrap()
+        };
+
+        let result = update_time_entry_impl(
+            &state,
+            running.id,
+            None,
+            None,
+            Some((now() + Duration::hours(1)).to_rfc3339()),
+            None,
+            None,
+        );
+
+        assert!(result.is_err(), "editing the running timer must be rejected");
+        let conn = state.db.lock().unwrap();
+        let reloaded = time_entries_repo::get_by_id(&conn, running.id).unwrap().unwrap();
+        assert!(reloaded.is_running(), "the entry must still be running, untouched, after the rejected edit");
     }
 
     #[test]

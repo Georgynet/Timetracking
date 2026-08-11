@@ -53,6 +53,13 @@ export function MainView({ onReconfigure }: { onReconfigure: () => void }) {
     return report;
   }
 
+  // The running timer can never be edited/deleted through History (see HistoryList),
+  // but refresh it here too whenever an entry changes — cheap insurance against the
+  // timer widget ever showing state that's stale relative to the DB.
+  async function handleEntriesChanged() {
+    await Promise.all([loadActiveTimer(), loadUnsyncedCount()]);
+  }
+
   if (!settings) return null;
 
   // Favorites and "my tasks" can overlap (e.g. a favorited ticket that's also
@@ -78,7 +85,7 @@ export function MainView({ onReconfigure }: { onReconfigure: () => void }) {
         <MyTasksPanel tasks={myTasks} onRefresh={refreshMyTasks} onStartTimer={handleStartTimer} />
         <FavoritesPanel tasks={favoriteTasks} onChanged={loadTasks} onStartTimer={handleStartTimer} />
       </div>
-      <HistoryList tasks={allTasks} refreshSignal={historyRefreshSignal} onEntriesChanged={loadUnsyncedCount} />
+      <HistoryList tasks={allTasks} refreshSignal={historyRefreshSignal} onEntriesChanged={handleEntriesChanged} />
       {syncReport && <SyncReportModal report={syncReport} onClose={() => setSyncReport(null)} />}
     </div>
   );

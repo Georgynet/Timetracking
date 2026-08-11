@@ -59,13 +59,22 @@ export const useStore = create<AppStore>((set, get) => ({
   },
 
   startTimer: async (taskId, comment) => {
-    await api.startTimer(taskId, comment);
-    await get().loadActiveTimer();
+    // Refresh from the backend even on failure — if our cached `activeTimer` was
+    // already stale (e.g. the running entry was ended by some other path), this is
+    // what lets the UI self-correct instead of getting stuck showing a phantom state.
+    try {
+      await api.startTimer(taskId, comment);
+    } finally {
+      await get().loadActiveTimer();
+    }
   },
 
   stopTimer: async () => {
-    await api.stopTimer();
-    await Promise.all([get().loadActiveTimer(), get().loadUnsyncedCount()]);
+    try {
+      await api.stopTimer();
+    } finally {
+      await Promise.all([get().loadActiveTimer(), get().loadUnsyncedCount()]);
+    }
   },
 
   runSync: async () => {
