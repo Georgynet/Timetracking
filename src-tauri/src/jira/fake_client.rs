@@ -23,6 +23,11 @@ pub struct FakeJiraClient {
     pub myself: Result<JiraMyself, JiraError>,
     pub issues_by_key: HashMap<String, JiraIssue>,
     pub search_results: Vec<JiraIssue>,
+    /// What a sprint-scoped search (any JQL containing `openSprints()` — see
+    /// `commands::tasks::refresh_my_tasks`) returns. `Ok(vec![])` by default, distinct
+    /// from `search_results`, so tests can simulate "some of my tasks are in the
+    /// active sprint" without the fake needing to actually parse JQL.
+    pub sprint_search_results: Result<Vec<JiraIssue>, JiraError>,
     /// Issue keys present here return this canned outcome for add/update worklog;
     /// keys absent default to a successful fake worklog id.
     pub worklog_outcomes: HashMap<String, Result<JiraWorklog, JiraError>>,
@@ -40,6 +45,7 @@ impl Default for FakeJiraClient {
             }),
             issues_by_key: HashMap::new(),
             search_results: Vec::new(),
+            sprint_search_results: Ok(Vec::new()),
             worklog_outcomes: HashMap::new(),
             calls: Mutex::new(Vec::new()),
             next_id: AtomicI64::new(1),
@@ -64,8 +70,12 @@ impl JiraClient for FakeJiraClient {
         self.myself.clone()
     }
 
-    async fn search_issues(&self, _jql: &str, _max_results: u32) -> Result<Vec<JiraIssue>, JiraError> {
-        Ok(self.search_results.clone())
+    async fn search_issues(&self, jql: &str, _max_results: u32) -> Result<Vec<JiraIssue>, JiraError> {
+        if jql.contains("openSprints()") {
+            self.sprint_search_results.clone()
+        } else {
+            Ok(self.search_results.clone())
+        }
     }
 
     async fn get_issue(&self, key_or_id: &str) -> Result<JiraIssue, JiraError> {

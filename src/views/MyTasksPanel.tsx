@@ -13,6 +13,7 @@ interface MyTasksPanelProps {
 export function MyTasksPanel({ tasks, jiraBaseUrl, onRefresh, onStartTimer }: MyTasksPanelProps) {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [currentSprintOnly, setCurrentSprintOnly] = useState(false);
 
   async function handleRefresh() {
     setRefreshing(true);
@@ -26,20 +27,34 @@ export function MyTasksPanel({ tasks, jiraBaseUrl, onRefresh, onStartTimer }: My
     }
   }
 
+  const visibleTasks = currentSprintOnly ? tasks.filter((t) => t.isInCurrentSprint) : tasks;
+
   return (
     <section className="panel">
       <div className="panel-header">
         <h2>My Tasks</h2>
-        <button onClick={handleRefresh} disabled={refreshing}>
-          {refreshing ? "Refreshing…" : "Refresh"}
-        </button>
+        <div className="panel-header-actions">
+          <label className="sprint-toggle">
+            <input
+              type="checkbox"
+              checked={currentSprintOnly}
+              onChange={(e) => setCurrentSprintOnly(e.target.checked)}
+            />
+            Current sprint
+          </label>
+          <button onClick={handleRefresh} disabled={refreshing}>
+            {refreshing ? "Refreshing…" : "Refresh"}
+          </button>
+        </div>
       </div>
       {error && <p className="error">{error}</p>}
       {tasks.length === 0 ? (
         <p className="empty-hint">No assigned tickets loaded yet — click Refresh.</p>
+      ) : visibleTasks.length === 0 ? (
+        <p className="empty-hint">No tickets in the current sprint.</p>
       ) : (
         <ul className="task-list task-list-capped my-tasks-list">
-          {tasks.map((t) => (
+          {visibleTasks.map((t) => (
             <li key={t.id}>
               <a
                 className="task-key jira-link"

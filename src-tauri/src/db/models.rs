@@ -9,6 +9,7 @@ pub struct Task {
     pub summary: String,
     pub is_favorite: bool,
     pub is_assigned_to_me: bool,
+    pub is_in_current_sprint: bool,
     pub last_synced_at: Option<DateTime<Utc>>,
 }
 

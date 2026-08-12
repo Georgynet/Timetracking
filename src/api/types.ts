@@ -4,6 +4,7 @@ export interface Task {
   summary: string;
   isFavorite: boolean;
   isAssignedToMe: boolean;
+  isInCurrentSprint: boolean;
   lastSyncedAt: string | null;
 }
 

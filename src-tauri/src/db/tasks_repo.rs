@@ -10,6 +10,7 @@ fn row_to_task(row: &Row) -> rusqlite::Result<Task> {
         summary: row.get("summary")?,
         is_favorite: row.get("is_favorite")?,
         is_assigned_to_me: row.get("is_assigned_to_me")?,
+        is_in_current_sprint: row.get("is_in_current_sprint")?,
         last_synced_at: row.get("last_synced_at")?,
     })
 }
@@ -37,12 +38,14 @@ pub fn list_favorite_tasks(conn: &Connection) -> rusqlite::Result<Vec<Task>> {
     rows.collect()
 }
 
-/// Clears `is_assigned_to_me` on every task, ahead of re-populating it from a fresh
-/// "my tasks" fetch. Never touches `is_favorite` — a ticket can be both, either, or
+/// Clears `is_assigned_to_me` (and, since it's only ever meaningful alongside it,
+/// `is_in_current_sprint`) on every task, ahead of re-populating both from a fresh "my
+/// tasks" fetch. Never touches `is_favorite` — a ticket can be both, either, or
 /// neither, and favorites are managed independently.
 pub fn reset_assigned_to_me(conn: &Connection) -> rusqlite::Result<()> {
     conn.execute(
-        "UPDATE tasks SET is_assigned_to_me = 0 WHERE is_assigned_to_me = 1",
+        "UPDATE tasks SET is_assigned_to_me = 0, is_in_current_sprint = 0
+         WHERE is_assigned_to_me = 1",
         [],
     )?;
     Ok(())
@@ -52,16 +55,18 @@ pub fn upsert_assigned_task(
     conn: &Connection,
     jira_key: &str,
     summary: &str,
+    is_in_current_sprint: bool,
     now: DateTime<Utc>,
 ) -> rusqlite::Result<Task> {
     conn.execute(
-        "INSERT INTO tasks (jira_key, summary, is_assigned_to_me, last_synced_at)
-         VALUES (?1, ?2, 1, ?3)
+        "INSERT INTO tasks (jira_key, summary, is_assigned_to_me, is_in_current_sprint, last_synced_at)
+         VALUES (?1, ?2, 1, ?3, ?4)
          ON CONFLICT(jira_key) DO UPDATE SET
             summary = excluded.summary,
             is_assigned_to_me = 1,
+            is_in_current_sprint = excluded.is_in_current_sprint,
             last_synced_at = excluded.last_synced_at",
-        params![jira_key, summary, now],
+        params![jira_key, summary, is_in_current_sprint, now],
     )?;
     Ok(get_task_by_key(conn, jira_key)?.expect("row was just upserted"))
 }
@@ -108,16 +113,18 @@ mod tests {
     fn refresh_never_touches_favorite_flag() {
         let conn = open_in_memory().unwrap();
         upsert_favorite_task(&conn, "TEAM-1", "Daily meetings", now()).unwrap();
-        upsert_assigned_task(&conn, "TEAM-1", "Daily meetings", now()).unwrap();
+        upsert_assigned_task(&conn, "TEAM-1", "Daily meetings", true, now()).unwrap();
 
         let task = get_task_by_key(&conn, "TEAM-1").unwrap().unwrap();
         assert!(task.is_favorite);
         assert!(task.is_assigned_to_me);
+        assert!(task.is_in_current_sprint);
 
         reset_assigned_to_me(&conn).unwrap();
         let task = get_task_by_key(&conn, "TEAM-1").unwrap().unwrap();
         assert!(task.is_favorite, "favorite flag must survive a my-tasks refresh");
         assert!(!task.is_assigned_to_me);
+        assert!(!task.is_in_current_sprint);
     }
 
     #[test]

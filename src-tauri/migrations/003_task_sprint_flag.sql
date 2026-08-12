@@ -1,0 +1,1 @@
+ALTER TABLE tasks ADD COLUMN is_in_current_sprint INTEGER NOT NULL DEFAULT 0;
