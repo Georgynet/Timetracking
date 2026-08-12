@@ -193,6 +193,51 @@ label {
   margin: 0;
 }
 
+/* Workday */
+.workday-widget {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5em;
+  padding: 1em;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-bg);
+}
+
+.workday-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75em;
+}
+
+.workday-display {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75em;
+}
+
+.workday-label {
+  font-weight: 600;
+}
+
+.workday-elapsed {
+  font-variant-numeric: tabular-nums;
+  font-size: 1.4em;
+}
+
+.workday-actions {
+  display: flex;
+  gap: 0.5em;
+}
+
+.workday-breaks,
+.workday-summary {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9em;
+}
+
 /* Panels */
 .panels-row {
   display: grid;

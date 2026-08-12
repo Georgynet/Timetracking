@@ -1,6 +1,13 @@
 import { create } from "zustand";
 import * as api from "../api/commands";
-import type { ActiveTimer, SettingsDto, SyncReport, Task } from "../api/types";
+import type {
+  ActiveTimer,
+  DailySummary,
+  SettingsDto,
+  SyncReport,
+  Task,
+  WorkdayStatus,
+} from "../api/types";
 
 interface AppStore {
   settings: SettingsDto | null;
@@ -9,6 +16,8 @@ interface AppStore {
   activeTimer: ActiveTimer | null;
   unsyncedCount: number;
   lastSyncReport: SyncReport | null;
+  activeWorkday: WorkdayStatus | null;
+  dailySummary: DailySummary | null;
   loading: boolean;
 
   loadSettings: () => Promise<void>;
@@ -19,6 +28,12 @@ interface AppStore {
   startTimer: (taskId: number, comment?: string) => Promise<void>;
   stopTimer: () => Promise<void>;
   runSync: () => Promise<SyncReport>;
+  loadActiveWorkday: () => Promise<void>;
+  loadDailySummary: () => Promise<void>;
+  startWorkday: () => Promise<void>;
+  endWorkday: () => Promise<void>;
+  startBreak: () => Promise<void>;
+  endBreak: () => Promise<void>;
 }
 
 export const useStore = create<AppStore>((set, get) => ({
@@ -28,6 +43,8 @@ export const useStore = create<AppStore>((set, get) => ({
   activeTimer: null,
   unsyncedCount: 0,
   lastSyncReport: null,
+  activeWorkday: null,
+  dailySummary: null,
   loading: true,
 
   loadSettings: async () => {
@@ -82,5 +99,47 @@ export const useStore = create<AppStore>((set, get) => ({
     set({ lastSyncReport: report });
     await get().loadUnsyncedCount();
     return report;
+  },
+
+  loadActiveWorkday: async () => {
+    const activeWorkday = await api.getActiveWorkday();
+    set({ activeWorkday });
+  },
+
+  loadDailySummary: async () => {
+    const dailySummary = await api.getDailySummary();
+    set({ dailySummary });
+  },
+
+  startWorkday: async () => {
+    try {
+      await api.startWorkday();
+    } finally {
+      await Promise.all([get().loadActiveWorkday(), get().loadDailySummary()]);
+    }
+  },
+
+  endWorkday: async () => {
+    try {
+      await api.endWorkday();
+    } finally {
+      await Promise.all([get().loadActiveWorkday(), get().loadDailySummary()]);
+    }
+  },
+
+  startBreak: async () => {
+    try {
+      await api.startBreak();
+    } finally {
+      await get().loadActiveWorkday();
+    }
+  },
+
+  endBreak: async () => {
+    try {
+      await api.endBreak();
+    } finally {
+      await Promise.all([get().loadActiveWorkday(), get().loadDailySummary()]);
+    }
   },
 }));

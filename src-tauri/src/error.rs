@@ -18,6 +18,9 @@ pub enum AppError {
     Timer(#[from] crate::timer::engine::TimerError),
 
     #[error("{0}")]
+    Workday(#[from] crate::workday::engine::WorkdayError),
+
+    #[error("{0}")]
     Validation(String),
 
     #[error("{0}")]

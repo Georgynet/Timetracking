@@ -41,3 +41,27 @@ pub struct SettingsRow {
     pub jira_base_url: Option<String>,
     pub jira_email: Option<String>,
 }
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkDay {
+    pub id: i64,
+    pub work_date: String,
+    pub started_at: DateTime<Utc>,
+    pub ended_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkBreak {
+    pub id: i64,
+    pub work_day_id: i64,
+    pub started_at: DateTime<Utc>,
+    pub ended_at: Option<DateTime<Utc>>,
+}
+
+impl WorkBreak {
+    pub fn is_running(&self) -> bool {
+        self.ended_at.is_none()
+    }
+}

@@ -8,6 +8,7 @@ import { HistoryList } from "./HistoryList";
 import { MyTasksPanel } from "./MyTasksPanel";
 import { SyncReportModal } from "./SyncReportModal";
 import { TimerWidget } from "./TimerWidget";
+import { WorkdayWidget } from "./WorkdayWidget";
 
 export function MainView({ onReconfigure }: { onReconfigure: () => void }) {
   const {
@@ -16,6 +17,8 @@ export function MainView({ onReconfigure }: { onReconfigure: () => void }) {
     favoriteTasks,
     activeTimer,
     unsyncedCount,
+    activeWorkday,
+    dailySummary,
     loadTasks,
     refreshMyTasks,
     loadActiveTimer,
@@ -23,6 +26,12 @@ export function MainView({ onReconfigure }: { onReconfigure: () => void }) {
     startTimer,
     stopTimer,
     runSync,
+    loadActiveWorkday,
+    loadDailySummary,
+    startWorkday,
+    endWorkday,
+    startBreak,
+    endBreak,
   } = useStore();
   const [trayAvailable, setTrayAvailable] = useState(true);
   const [syncReport, setSyncReport] = useState<SyncReport | null>(null);
@@ -32,9 +41,18 @@ export function MainView({ onReconfigure }: { onReconfigure: () => void }) {
     loadTasks();
     loadActiveTimer();
     loadUnsyncedCount();
+    loadActiveWorkday();
+    loadDailySummary();
     isTrayAvailable().then(setTrayAvailable);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // A synced/edited/deleted time entry can change the "logged" side of today's
+  // worked-vs-logged comparison, so refresh it alongside the history list.
+  useEffect(() => {
+    if (historyRefreshSignal > 0) loadDailySummary();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [historyRefreshSignal]);
 
   async function handleStartTimer(taskId: number) {
     await startTimer(taskId);
@@ -74,6 +92,14 @@ export function MainView({ onReconfigure }: { onReconfigure: () => void }) {
         trayAvailable={trayAvailable}
         onSync={handleSync}
         onReconfigure={onReconfigure}
+      />
+      <WorkdayWidget
+        activeWorkday={activeWorkday}
+        dailySummary={dailySummary}
+        onStartWorkday={startWorkday}
+        onEndWorkday={endWorkday}
+        onStartBreak={startBreak}
+        onEndBreak={endBreak}
       />
       <TimerWidget
         activeTimer={activeTimer}

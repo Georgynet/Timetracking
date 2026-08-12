@@ -57,5 +57,34 @@ export interface SyncReport {
   failed: SyncFailure[];
 }
 
+export interface WorkDay {
+  id: number;
+  workDate: string;
+  startedAt: string;
+  endedAt: string | null;
+}
+
+export interface WorkBreak {
+  id: number;
+  workDayId: number;
+  startedAt: string;
+  endedAt: string | null;
+}
+
+export interface WorkdayStatus extends WorkDay {
+  breaks: WorkBreak[];
+  isOnBreak: boolean;
+  /** Worked/break seconds already banked today from earlier, already-ended sessions. */
+  priorWorkedSecondsToday: number;
+  priorBreakSecondsToday: number;
+}
+
+export interface DailySummary {
+  date: string;
+  workedSeconds: number;
+  loggedSeconds: number;
+  diffSeconds: number;
+}
+
 /** Tauri commands reject with a plain string (see `error::AppError`'s `Serialize` impl). */
 export type CommandError = string;

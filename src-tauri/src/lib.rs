@@ -9,6 +9,7 @@ mod secrets;
 mod state;
 mod sync;
 mod timer;
+mod workday;
 
 use std::sync::Arc;
 
@@ -71,6 +72,12 @@ pub fn run() {
             commands::entries::delete_draft_entry,
             commands::sync::sync_all,
             commands::sync::list_unsynced_count,
+            commands::workday::get_active_workday,
+            commands::workday::start_workday,
+            commands::workday::end_workday,
+            commands::workday::start_break,
+            commands::workday::end_break,
+            commands::workday::get_daily_summary,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

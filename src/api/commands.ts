@@ -1,12 +1,16 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
   ActiveTimer,
+  DailySummary,
   JiraIssue,
   JiraMyself,
   SettingsDto,
   SyncReport,
   Task,
   TimeEntry,
+  WorkBreak,
+  WorkDay,
+  WorkdayStatus,
 } from "./types";
 
 export const getSettings = () => invoke<SettingsDto>("get_settings");
@@ -87,3 +91,16 @@ export const syncAll = () => invoke<SyncReport>("sync_all");
 export const listUnsyncedCount = () => invoke<number>("list_unsynced_count");
 
 export const isTrayAvailable = () => invoke<boolean>("is_tray_available");
+
+export const getActiveWorkday = () => invoke<WorkdayStatus | null>("get_active_workday");
+
+export const startWorkday = () => invoke<WorkDay>("start_workday");
+
+export const endWorkday = () => invoke<WorkDay>("end_workday");
+
+export const startBreak = () => invoke<WorkBreak>("start_break");
+
+export const endBreak = () => invoke<WorkBreak>("end_break");
+
+export const getDailySummary = (date?: string) =>
+  invoke<DailySummary>("get_daily_summary", { date: date ?? null });

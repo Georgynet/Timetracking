@@ -3,6 +3,7 @@ pub mod setup;
 pub mod sync;
 pub mod tasks;
 pub mod timer;
+pub mod workday;
 
 use tauri::State;
 
