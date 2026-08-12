@@ -1,11 +1,23 @@
 import { confirm } from "@tauri-apps/plugin-dialog";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { addDays, endOfDay, format, isToday, isYesterday, startOfDay, subDays } from "date-fns";
 import { useEffect, useState } from "react";
 import { deleteDraftEntry, listTimeEntries } from "../api/commands";
 import type { Task, TimeEntry } from "../api/types";
 import { formatDuration } from "../lib/format";
 import { jiraIssueUrl } from "../lib/jira";
 import { ManualEntryForm } from "./ManualEntryForm";
+
+/** A local calendar day's bounds, as ISO instants, for filtering history to that day. */
+function dayRange(date: Date): { from: string; to: string } {
+  return { from: startOfDay(date).toISOString(), to: endOfDay(date).toISOString() };
+}
+
+function dayLabel(date: Date): string {
+  if (isToday(date)) return "Today";
+  if (isYesterday(date)) return "Yesterday";
+  return format(date, "EEE, MMM d, yyyy");
+}
 
 function canEdit(entry: TimeEntry): boolean {
   return entry.endedAt !== null && !entry.isSynced;
@@ -23,13 +35,14 @@ interface HistoryListProps {
 }
 
 export function HistoryList({ tasks, jiraBaseUrl, refreshSignal, onEntriesChanged }: HistoryListProps) {
+  const [selectedDate, setSelectedDate] = useState(() => startOfDay(new Date()));
   const [entries, setEntries] = useState<TimeEntry[]>([]);
   const [editingEntry, setEditingEntry] = useState<TimeEntry | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
 
   async function reload() {
     try {
-      setEntries(await listTimeEntries());
+      setEntries(await listTimeEntries(dayRange(selectedDate)));
     } catch (err) {
       setError(err as string);
     }
@@ -38,7 +51,7 @@ export function HistoryList({ tasks, jiraBaseUrl, refreshSignal, onEntriesChange
   useEffect(() => {
     reload();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [refreshSignal]);
+  }, [refreshSignal, selectedDate]);
 
   async function handleDelete(id: number) {
     const confirmed = await confirm("Delete this entry? This cannot be undone.", {
@@ -66,9 +79,18 @@ export function HistoryList({ tasks, jiraBaseUrl, refreshSignal, onEntriesChange
         <h2>History</h2>
         <button onClick={() => setEditingEntry(null)}>New manual entry</button>
       </div>
+      <div className="history-nav">
+        <button onClick={() => setSelectedDate((d) => subDays(d, 1))}>&lt; Prev</button>
+        <span className="history-nav-date">{dayLabel(selectedDate)}</span>
+        <button onClick={() => setSelectedDate((d) => addDays(d, 1))} disabled={isToday(selectedDate)}>
+          Next &gt;
+        </button>
+      </div>
       {error && <p className="error">{error}</p>}
       {entries.length === 0 ? (
-        <p className="empty-hint">No time entries yet.</p>
+        <p className="empty-hint">
+          No time entries {isToday(selectedDate) ? "yet today" : "on this day"}.
+        </p>
       ) : (
         <table className="history-table">
           <thead>

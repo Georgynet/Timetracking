@@ -326,6 +326,20 @@ label {
 }
 
 /* History */
+.history-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1em;
+  margin: 0.75em 0 0;
+}
+
+.history-nav-date {
+  min-width: 11em;
+  text-align: center;
+  font-weight: 600;
+}
+
 .history-table {
   width: 100%;
   border-collapse: collapse;
