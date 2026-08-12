@@ -86,5 +86,13 @@ export interface DailySummary {
   diffSeconds: number;
 }
 
+export interface RangeSummary {
+  from: string;
+  to: string;
+  workedSeconds: number;
+  loggedSeconds: number;
+  diffSeconds: number;
+}
+
 /** Tauri commands reject with a plain string (see `error::AppError`'s `Serialize` impl). */
 export type CommandError = string;

@@ -27,3 +27,4 @@ it instead, so the history of *why* stays intact.
 | [0015](0015-task-summary-denormalized-onto-time-entry.md) | Denormalize the ticket summary onto `TimeEntry` for the history tooltip | Accepted |
 | [0016](0016-jira-links-via-opener-plugin.md) | Link tickets to Jira via the `opener` plugin, not plain anchor navigation | Accepted |
 | [0017](0017-local-only-workday-tracking-with-breaks.md) | Local-only workday tracking (start/end + breaks), compared against Jira-logged time | Accepted |
+| [0018](0018-week-and-month-to-date-summaries.md) | Week-to-date and month-to-date summaries, generalized from the daily one | Accepted |

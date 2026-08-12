@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
-import type { DailySummary, WorkBreak, WorkdayStatus } from "../api/types";
+import type { DailySummary, RangeSummary, WorkBreak, WorkdayStatus } from "../api/types";
 import { formatDuration, formatElapsed } from "../lib/format";
 
 interface WorkdayWidgetProps {
   activeWorkday: WorkdayStatus | null;
   dailySummary: DailySummary | null;
+  weekSummary: RangeSummary | null;
+  monthSummary: RangeSummary | null;
   onStartWorkday: () => Promise<void>;
   onEndWorkday: () => Promise<void>;
   onStartBreak: () => Promise<void>;
@@ -38,6 +40,8 @@ function formatDiff(diffSeconds: number): string {
 export function WorkdayWidget({
   activeWorkday,
   dailySummary,
+  weekSummary,
+  monthSummary,
   onStartWorkday,
   onEndWorkday,
   onStartBreak,
@@ -75,6 +79,17 @@ export function WorkdayWidget({
     ? activeWorkday.priorBreakSecondsToday + currentSessionBreakSeconds(activeWorkday, now)
     : 0;
   const loggedToday = dailySummary?.loggedSeconds ?? 0;
+
+  // Week/month totals are only as fresh as their last fetch, but they both include
+  // today's contribution as of that same fetch (see `loadPeriodSummaries`) — swapping
+  // that stale slice for the live-ticking `workedToday` keeps them from visibly lagging
+  // behind the "Today" line while a workday is running.
+  const workedThisWeek = weekSummary
+    ? weekSummary.workedSeconds - (dailySummary?.workedSeconds ?? 0) + workedToday
+    : 0;
+  const workedThisMonth = monthSummary
+    ? monthSummary.workedSeconds - (dailySummary?.workedSeconds ?? 0) + workedToday
+    : 0;
 
   return (
     <section className="workday-widget">
@@ -119,6 +134,8 @@ export function WorkdayWidget({
         <p className="workday-summary">
           Today: worked {formatDuration(workedToday)} · logged {formatDuration(loggedToday)} · diff{" "}
           {formatDiff(workedToday - loggedToday)}
+          {weekSummary && <> · This week: worked {formatDuration(workedThisWeek)}</>}
+          {monthSummary && <> · This month: worked {formatDuration(workedThisMonth)}</>}
         </p>
       )}
     </section>

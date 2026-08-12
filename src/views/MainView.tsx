@@ -19,6 +19,8 @@ export function MainView({ onReconfigure }: { onReconfigure: () => void }) {
     unsyncedCount,
     activeWorkday,
     dailySummary,
+    weekSummary,
+    monthSummary,
     loadTasks,
     refreshMyTasks,
     loadActiveTimer,
@@ -27,7 +29,7 @@ export function MainView({ onReconfigure }: { onReconfigure: () => void }) {
     stopTimer,
     runSync,
     loadActiveWorkday,
-    loadDailySummary,
+    loadPeriodSummaries,
     startWorkday,
     endWorkday,
     startBreak,
@@ -42,15 +44,15 @@ export function MainView({ onReconfigure }: { onReconfigure: () => void }) {
     loadActiveTimer();
     loadUnsyncedCount();
     loadActiveWorkday();
-    loadDailySummary();
+    loadPeriodSummaries();
     isTrayAvailable().then(setTrayAvailable);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // A synced/edited/deleted time entry can change the "logged" side of today's
-  // worked-vs-logged comparison, so refresh it alongside the history list.
+  // A synced/edited/deleted time entry can change the "logged" side of the
+  // worked-vs-logged comparisons, so refresh them alongside the history list.
   useEffect(() => {
-    if (historyRefreshSignal > 0) loadDailySummary();
+    if (historyRefreshSignal > 0) loadPeriodSummaries();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [historyRefreshSignal]);
 
@@ -96,6 +98,8 @@ export function MainView({ onReconfigure }: { onReconfigure: () => void }) {
       <WorkdayWidget
         activeWorkday={activeWorkday}
         dailySummary={dailySummary}
+        weekSummary={weekSummary}
+        monthSummary={monthSummary}
         onStartWorkday={startWorkday}
         onEndWorkday={endWorkday}
         onStartBreak={startBreak}
