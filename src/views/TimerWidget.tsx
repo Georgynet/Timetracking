@@ -1,13 +1,6 @@
 import { useEffect, useState } from "react";
 import type { ActiveTimer, Task } from "../api/types";
-
-function formatElapsed(seconds: number): string {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = Math.floor(seconds % 60);
-  const pad = (n: number) => n.toString().padStart(2, "0");
-  return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
-}
+import { formatElapsed } from "../lib/format";
 
 interface TimerWidgetProps {
   activeTimer: ActiveTimer | null;

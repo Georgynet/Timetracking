@@ -3,15 +3,9 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { useEffect, useState } from "react";
 import { deleteDraftEntry, listTimeEntries } from "../api/commands";
 import type { Task, TimeEntry } from "../api/types";
+import { formatDuration } from "../lib/format";
 import { jiraIssueUrl } from "../lib/jira";
 import { ManualEntryForm } from "./ManualEntryForm";
-
-function formatDuration(seconds: number | null): string {
-  if (seconds === null) return "—";
-  const h = Math.floor(seconds / 3600);
-  const m = Math.round((seconds % 3600) / 60);
-  return h > 0 ? `${h}h ${m}m` : `${m}m`;
-}
 
 function canEdit(entry: TimeEntry): boolean {
   return entry.endedAt !== null && !entry.isSynced;
