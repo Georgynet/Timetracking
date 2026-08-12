@@ -4,6 +4,7 @@ import type {
   DailySummary,
   JiraIssue,
   JiraMyself,
+  RangeSummary,
   SettingsDto,
   SyncReport,
   Task,
@@ -104,3 +105,7 @@ export const endBreak = () => invoke<WorkBreak>("end_break");
 
 export const getDailySummary = (date?: string) =>
   invoke<DailySummary>("get_daily_summary", { date: date ?? null });
+
+export const getWeekSummary = () => invoke<RangeSummary>("get_week_summary");
+
+export const getMonthSummary = () => invoke<RangeSummary>("get_month_summary");

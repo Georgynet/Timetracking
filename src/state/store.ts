@@ -3,6 +3,7 @@ import * as api from "../api/commands";
 import type {
   ActiveTimer,
   DailySummary,
+  RangeSummary,
   SettingsDto,
   SyncReport,
   Task,
@@ -18,6 +19,8 @@ interface AppStore {
   lastSyncReport: SyncReport | null;
   activeWorkday: WorkdayStatus | null;
   dailySummary: DailySummary | null;
+  weekSummary: RangeSummary | null;
+  monthSummary: RangeSummary | null;
   loading: boolean;
 
   loadSettings: () => Promise<void>;
@@ -30,6 +33,9 @@ interface AppStore {
   runSync: () => Promise<SyncReport>;
   loadActiveWorkday: () => Promise<void>;
   loadDailySummary: () => Promise<void>;
+  loadWeekSummary: () => Promise<void>;
+  loadMonthSummary: () => Promise<void>;
+  loadPeriodSummaries: () => Promise<void>;
   startWorkday: () => Promise<void>;
   endWorkday: () => Promise<void>;
   startBreak: () => Promise<void>;
@@ -45,6 +51,8 @@ export const useStore = create<AppStore>((set, get) => ({
   lastSyncReport: null,
   activeWorkday: null,
   dailySummary: null,
+  weekSummary: null,
+  monthSummary: null,
   loading: true,
 
   loadSettings: async () => {
@@ -111,11 +119,25 @@ export const useStore = create<AppStore>((set, get) => ({
     set({ dailySummary });
   },
 
+  loadWeekSummary: async () => {
+    const weekSummary = await api.getWeekSummary();
+    set({ weekSummary });
+  },
+
+  loadMonthSummary: async () => {
+    const monthSummary = await api.getMonthSummary();
+    set({ monthSummary });
+  },
+
+  loadPeriodSummaries: async () => {
+    await Promise.all([get().loadDailySummary(), get().loadWeekSummary(), get().loadMonthSummary()]);
+  },
+
   startWorkday: async () => {
     try {
       await api.startWorkday();
     } finally {
-      await Promise.all([get().loadActiveWorkday(), get().loadDailySummary()]);
+      await Promise.all([get().loadActiveWorkday(), get().loadPeriodSummaries()]);
     }
   },
 
@@ -123,7 +145,7 @@ export const useStore = create<AppStore>((set, get) => ({
     try {
       await api.endWorkday();
     } finally {
-      await Promise.all([get().loadActiveWorkday(), get().loadDailySummary()]);
+      await Promise.all([get().loadActiveWorkday(), get().loadPeriodSummaries()]);
     }
   },
 
@@ -139,7 +161,7 @@ export const useStore = create<AppStore>((set, get) => ({
     try {
       await api.endBreak();
     } finally {
-      await Promise.all([get().loadActiveWorkday(), get().loadDailySummary()]);
+      await Promise.all([get().loadActiveWorkday(), get().loadPeriodSummaries()]);
     }
   },
 }));

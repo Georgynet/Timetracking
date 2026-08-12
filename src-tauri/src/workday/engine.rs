@@ -1,4 +1,4 @@
-use chrono::{DateTime, Local, LocalResult, NaiveDate, TimeZone, Utc};
+use chrono::{DateTime, Datelike, Local, LocalResult, NaiveDate, TimeZone, Utc};
 use rusqlite::Connection;
 use serde::Serialize;
 
@@ -26,6 +26,28 @@ pub struct DailySummary {
     pub worked_seconds: i64,
     pub logged_seconds: i64,
     pub diff_seconds: i64,
+}
+
+/// Same shape as `DailySummary` but spanning an inclusive `[from, to]` range of local
+/// calendar dates, for the week-to-date / month-to-date totals shown alongside today's.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RangeSummary {
+    pub from: String,
+    pub to: String,
+    pub worked_seconds: i64,
+    pub logged_seconds: i64,
+    pub diff_seconds: i64,
+}
+
+/// The Monday that starts the local-calendar week containing `date`.
+pub fn week_start(date: NaiveDate) -> NaiveDate {
+    date - chrono::Duration::days(date.weekday().num_days_from_monday() as i64)
+}
+
+/// The first of the local-calendar month containing `date`.
+pub fn month_start(date: NaiveDate) -> NaiveDate {
+    date.with_day(1).expect("day 1 is always valid")
 }
 
 /// The local (single-user desktop) calendar date for a UTC instant — "workday" and
@@ -118,46 +140,71 @@ pub fn prior_today_seconds(
     Ok((worked, breaks_total))
 }
 
-/// The local calendar day, expressed as UTC instant bounds `[start, end)`, used to
-/// select which `time_entries` rows count as "logged" for that day. Ambiguous local
-/// times (a DST fold) resolve to the earlier instant; this is a best-effort choice for
-/// a twice-a-year edge case, not a correctness-critical one.
-fn local_day_bounds_utc(date: NaiveDate) -> (DateTime<Utc>, DateTime<Utc>) {
-    let to_utc = |naive| match Local.from_local_datetime(&naive) {
+/// A local calendar instant, expressed as a UTC `DateTime`. Ambiguous local times (a
+/// DST fold) resolve to the earlier instant; this is a best-effort choice for a
+/// twice-a-year edge case, not a correctness-critical one.
+fn local_instant_utc(naive: chrono::NaiveDateTime) -> DateTime<Utc> {
+    match Local.from_local_datetime(&naive) {
         LocalResult::Single(dt) => dt.with_timezone(&Utc),
         LocalResult::Ambiguous(earliest, _) => earliest.with_timezone(&Utc),
         LocalResult::None => Utc.from_utc_datetime(&naive),
-    };
-    let start = to_utc(date.and_hms_opt(0, 0, 0).unwrap());
-    let end = to_utc((date + chrono::Duration::days(1)).and_hms_opt(0, 0, 0).unwrap());
+    }
+}
+
+/// The inclusive local calendar range `[from, to]`, expressed as UTC instant bounds
+/// `[start, end)`, used to select which `time_entries` rows count as "logged" within it.
+fn local_range_bounds_utc(from: NaiveDate, to: NaiveDate) -> (DateTime<Utc>, DateTime<Utc>) {
+    let start = local_instant_utc(from.and_hms_opt(0, 0, 0).unwrap());
+    let end = local_instant_utc((to + chrono::Duration::days(1)).and_hms_opt(0, 0, 0).unwrap());
     (start, end)
 }
 
-/// Sums worked time (across every workday session on `date`, i.e. split shifts) and
-/// Jira-logged time for that same local day, so the caller can show the gap between
-/// actual desk time and time that made it into a ticket.
+/// Sums worked time (across every workday session in `[from, to]`, i.e. split shifts)
+/// and Jira-logged time for that same local range, so the caller can show the gap
+/// between actual desk time and time that made it into a ticket. `daily_summary` is
+/// just this with `from == to`.
+pub fn range_summary(
+    conn: &Connection,
+    from: NaiveDate,
+    to: NaiveDate,
+    now: DateTime<Utc>,
+) -> Result<RangeSummary, WorkdayError> {
+    let mut worked = 0i64;
+    let mut date = from;
+    while date <= to {
+        let date_str = date.format("%Y-%m-%d").to_string();
+        let days = work_days_repo::work_days_for_date(conn, &date_str)?;
+        for day in &days {
+            let breaks = work_days_repo::breaks_for_day(conn, day.id)?;
+            worked += worked_seconds(day, &breaks, now);
+        }
+        date += chrono::Duration::days(1);
+    }
+
+    let (from_utc, to_utc) = local_range_bounds_utc(from, to);
+    let entries = time_entries_repo::list_entries(conn, None, Some(from_utc), Some(to_utc))?;
+    let logged: i64 = entries.iter().filter_map(|e| e.duration_seconds).sum();
+
+    Ok(RangeSummary {
+        from: from.format("%Y-%m-%d").to_string(),
+        to: to.format("%Y-%m-%d").to_string(),
+        worked_seconds: worked,
+        logged_seconds: logged,
+        diff_seconds: worked - logged,
+    })
+}
+
 pub fn daily_summary(
     conn: &Connection,
     date: NaiveDate,
     now: DateTime<Utc>,
 ) -> Result<DailySummary, WorkdayError> {
-    let date_str = date.format("%Y-%m-%d").to_string();
-    let days = work_days_repo::work_days_for_date(conn, &date_str)?;
-    let mut worked = 0i64;
-    for day in &days {
-        let breaks = work_days_repo::breaks_for_day(conn, day.id)?;
-        worked += worked_seconds(day, &breaks, now);
-    }
-
-    let (from, to) = local_day_bounds_utc(date);
-    let entries = time_entries_repo::list_entries(conn, None, Some(from), Some(to))?;
-    let logged: i64 = entries.iter().filter_map(|e| e.duration_seconds).sum();
-
+    let range = range_summary(conn, date, date, now)?;
     Ok(DailySummary {
-        date: date_str,
-        worked_seconds: worked,
-        logged_seconds: logged,
-        diff_seconds: worked - logged,
+        date: range.from,
+        worked_seconds: range.worked_seconds,
+        logged_seconds: range.logged_seconds,
+        diff_seconds: range.diff_seconds,
     })
 }
 
@@ -284,6 +331,54 @@ mod tests {
 
         let date = NaiveDate::from_ymd_opt(2026, 8, 11).unwrap();
         let summary = daily_summary(&conn, date, morning_start + chrono::Duration::hours(10)).unwrap();
+
+        assert_eq!(summary.worked_seconds, 7 * 3600);
+        assert_eq!(summary.logged_seconds, 2 * 3600);
+        assert_eq!(summary.diff_seconds, 5 * 3600);
+    }
+
+    #[test]
+    fn week_start_returns_the_monday_of_the_week() {
+        let monday = NaiveDate::from_ymd_opt(2023, 1, 2).unwrap();
+        assert_eq!(week_start(monday), monday, "Monday itself is its own week start");
+        assert_eq!(week_start(monday + chrono::Duration::days(2)), monday, "Wednesday");
+        assert_eq!(week_start(monday + chrono::Duration::days(6)), monday, "Sunday");
+    }
+
+    #[test]
+    fn month_start_returns_the_first_of_the_month() {
+        let date = NaiveDate::from_ymd_opt(2026, 8, 17).unwrap();
+        assert_eq!(month_start(date), NaiveDate::from_ymd_opt(2026, 8, 1).unwrap());
+    }
+
+    #[test]
+    fn range_summary_sums_worked_and_logged_time_across_multiple_days() {
+        let conn = open_in_memory().unwrap();
+        let task_id = tasks_repo::upsert_favorite_task(&conn, "PROJ-1", "Ticket", now()).unwrap().id;
+
+        let day1_start = Utc.with_ymd_and_hms(2026, 8, 10, 9, 0, 0).unwrap();
+        let day1 = work_days_repo::insert_running(&conn, "2026-08-10", day1_start).unwrap();
+        work_days_repo::stop_running(&conn, day1.id, day1_start + chrono::Duration::hours(4)).unwrap();
+
+        let day2_start = Utc.with_ymd_and_hms(2026, 8, 11, 9, 0, 0).unwrap();
+        let day2 = work_days_repo::insert_running(&conn, "2026-08-11", day2_start).unwrap();
+        work_days_repo::stop_running(&conn, day2.id, day2_start + chrono::Duration::hours(3)).unwrap();
+
+        // Logged on day 1, comfortably clear of local-midnight boundaries.
+        let logged_start = Utc.with_ymd_and_hms(2026, 8, 10, 12, 0, 0).unwrap();
+        time_entries_repo::insert_manual(
+            &conn,
+            task_id,
+            logged_start,
+            logged_start + chrono::Duration::hours(2),
+            2 * 3600,
+            None,
+        )
+        .unwrap();
+
+        let from = NaiveDate::from_ymd_opt(2026, 8, 10).unwrap();
+        let to = NaiveDate::from_ymd_opt(2026, 8, 11).unwrap();
+        let summary = range_summary(&conn, from, to, day2_start + chrono::Duration::hours(10)).unwrap();
 
         assert_eq!(summary.worked_seconds, 7 * 3600);
         assert_eq!(summary.logged_seconds, 2 * 3600);

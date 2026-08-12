@@ -6,7 +6,7 @@ use crate::db::models::{WorkBreak, WorkDay};
 use crate::db::work_days_repo;
 use crate::error::{AppError, AppResult};
 use crate::state::AppState;
-use crate::workday::engine::{self, DailySummary};
+use crate::workday::engine::{self, DailySummary, RangeSummary};
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -106,6 +106,32 @@ pub fn get_daily_summary(state: State<'_, AppState>, date: Option<String>) -> Ap
     get_daily_summary_impl(&state, date)
 }
 
+/// Week-to-date: from the Monday of the current local week through today.
+fn get_week_summary_impl(state: &AppState) -> AppResult<RangeSummary> {
+    let now = Utc::now();
+    let today = engine::local_date(now);
+    let conn = state.db.lock().unwrap();
+    Ok(engine::range_summary(&conn, engine::week_start(today), today, now)?)
+}
+
+#[tauri::command]
+pub fn get_week_summary(state: State<'_, AppState>) -> AppResult<RangeSummary> {
+    get_week_summary_impl(&state)
+}
+
+/// Month-to-date: from the 1st of the current local month through today.
+fn get_month_summary_impl(state: &AppState) -> AppResult<RangeSummary> {
+    let now = Utc::now();
+    let today = engine::local_date(now);
+    let conn = state.db.lock().unwrap();
+    Ok(engine::range_summary(&conn, engine::month_start(today), today, now)?)
+}
+
+#[tauri::command]
+pub fn get_month_summary(state: State<'_, AppState>) -> AppResult<RangeSummary> {
+    get_month_summary_impl(&state)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -201,5 +227,25 @@ mod tests {
         let state = setup();
         let result = get_daily_summary_impl(&state, Some("not-a-date".into()));
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn week_summary_spans_from_monday_through_today() {
+        let state = setup();
+        let today = engine::local_date(Utc::now());
+        let summary = get_week_summary_impl(&state).unwrap();
+        assert_eq!(summary.from, engine::week_start(today).format("%Y-%m-%d").to_string());
+        assert_eq!(summary.to, today.format("%Y-%m-%d").to_string());
+        assert_eq!(summary.worked_seconds, 0);
+    }
+
+    #[test]
+    fn month_summary_spans_from_the_1st_through_today() {
+        let state = setup();
+        let today = engine::local_date(Utc::now());
+        let summary = get_month_summary_impl(&state).unwrap();
+        assert_eq!(summary.from, engine::month_start(today).format("%Y-%m-%d").to_string());
+        assert_eq!(summary.to, today.format("%Y-%m-%d").to_string());
+        assert_eq!(summary.worked_seconds, 0);
     }
 }
