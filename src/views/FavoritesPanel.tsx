@@ -31,6 +31,12 @@ export function FavoritesPanel({ tasks, jiraBaseUrl, onChanged, onStartTimer }: 
     }
   }
 
+  function handleClearSearch() {
+    setQuery("");
+    setResults([]);
+    setError(null);
+  }
+
   async function handleAdd(key: string) {
     setError(null);
     try {
@@ -64,25 +70,29 @@ export function FavoritesPanel({ tasks, jiraBaseUrl, onChanged, onStartTimer }: 
         <button onClick={handleSearch} disabled={searching || !query.trim()}>
           {searching ? "Searching…" : "Search"}
         </button>
+        {(results.length > 0 || query) && (
+          <button onClick={handleClearSearch} disabled={searching}>
+            Clear
+          </button>
+        )}
       </div>
       {error && <p className="error">{error}</p>}
-      {results.length > 0 && (
-        <ul className="task-list search-results">
+      {results.length === 0 && tasks.length === 0 ? (
+        <p className="empty-hint">No favorites yet — search for a ticket above.</p>
+      ) : (
+        // Search results and saved favorites share one list — one scrollable area
+        // capped at 4 rows total, rather than two separate capped lists stacked on
+        // top of each other.
+        <ul className="task-list task-list-capped favorites-list">
           {results.map((issue) => (
-            <li key={issue.key}>
+            <li key={`result-${issue.key}`}>
               <span className="task-key">{issue.key}</span>
               <span className="task-summary">{issue.summary}</span>
               <button onClick={() => handleAdd(issue.key)}>Add favorite</button>
             </li>
           ))}
-        </ul>
-      )}
-      {tasks.length === 0 ? (
-        <p className="empty-hint">No favorites yet — search for a ticket above.</p>
-      ) : (
-        <ul className="task-list">
           {tasks.map((t) => (
-            <li key={t.id}>
+            <li key={`favorite-${t.id}`}>
               <a
                 className="task-key jira-link"
                 href={jiraIssueUrl(jiraBaseUrl, t.jiraKey)}

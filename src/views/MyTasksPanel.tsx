@@ -38,7 +38,7 @@ export function MyTasksPanel({ tasks, jiraBaseUrl, onRefresh, onStartTimer }: My
       {tasks.length === 0 ? (
         <p className="empty-hint">No assigned tickets loaded yet — click Refresh.</p>
       ) : (
-        <ul className="task-list">
+        <ul className="task-list task-list-capped my-tasks-list">
           {tasks.map((t) => (
             <li key={t.id}>
               <a

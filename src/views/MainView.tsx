@@ -49,8 +49,9 @@ export function MainView({ onReconfigure }: { onReconfigure: () => void }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // A synced/edited/deleted time entry can change the "logged" side of the
-  // worked-vs-logged comparisons, so refresh them alongside the history list.
+  // A sync can change the "logged" side of the worked-vs-logged comparisons (a
+  // worklog push can succeed or fail), so refresh them alongside the history list.
+  // Direct edits/deletes in History go through `handleEntriesChanged` instead.
   useEffect(() => {
     if (historyRefreshSignal > 0) loadPeriodSummaries();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -75,9 +76,12 @@ export function MainView({ onReconfigure }: { onReconfigure: () => void }) {
 
   // The running timer can never be edited/deleted through History (see HistoryList),
   // but refresh it here too whenever an entry changes — cheap insurance against the
-  // timer widget ever showing state that's stale relative to the DB.
+  // timer widget ever showing state that's stale relative to the DB. An edit/delete
+  // also changes the "logged" side of the worked-vs-logged comparisons, so refresh
+  // those too — this is the only path into HistoryList's edit/delete that doesn't
+  // already go through `historyRefreshSignal`.
   async function handleEntriesChanged() {
-    await Promise.all([loadActiveTimer(), loadUnsyncedCount()]);
+    await Promise.all([loadActiveTimer(), loadUnsyncedCount(), loadPeriodSummaries()]);
   }
 
   if (!settings || !settings.jiraBaseUrl) return null;
