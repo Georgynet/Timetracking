@@ -1,17 +1,7 @@
 import { FormEvent, useState } from "react";
 import { createManualEntry, updateTimeEntry } from "../api/commands";
 import type { Task, TimeEntry } from "../api/types";
-
-function toDateInput(iso: string): string {
-  return iso.slice(0, 10);
-}
-function toTimeInput(iso: string): string {
-  const d = new Date(iso);
-  return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
-}
-function combine(date: string, time: string): string {
-  return new Date(`${date}T${time}`).toISOString();
-}
+import { combine, toDateInput, toTimeInput } from "../lib/format";
 
 interface ManualEntryFormProps {
   tasks: Task[];

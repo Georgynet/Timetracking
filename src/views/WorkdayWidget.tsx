@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { DailySummary, RangeSummary, WorkBreak, WorkdayStatus } from "../api/types";
 import { formatDuration, formatElapsed } from "../lib/format";
+import { EditBreakForm } from "./EditBreakForm";
 
 interface WorkdayWidgetProps {
   activeWorkday: WorkdayStatus | null;
@@ -11,6 +12,7 @@ interface WorkdayWidgetProps {
   onEndWorkday: () => Promise<void>;
   onStartBreak: () => Promise<void>;
   onEndBreak: () => Promise<void>;
+  onBreakUpdated: () => Promise<void>;
 }
 
 function breakSeconds(brk: WorkBreak, nowMs: number): number {
@@ -46,10 +48,12 @@ export function WorkdayWidget({
   onEndWorkday,
   onStartBreak,
   onEndBreak,
+  onBreakUpdated,
 }: WorkdayWidgetProps) {
   const [now, setNow] = useState(() => Date.now());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [editingBreak, setEditingBreak] = useState<WorkBreak | null>(null);
 
   useEffect(() => {
     if (!activeWorkday) return;
@@ -125,10 +129,29 @@ export function WorkdayWidget({
       {breaksToday > 0 && (
         <p className="workday-breaks">
           Breaks:{" "}
-          {activeWorkday && activeWorkday.breaks.length > 0
-            ? `${activeWorkday.breaks.map((b) => formatDuration(Math.round(breakSeconds(b, now)))).join(", ")} (${formatDuration(breaksToday)} total today)`
-            : `${formatDuration(breaksToday)} today`}
+          {activeWorkday && activeWorkday.breaks.length > 0 ? (
+            <>
+              {activeWorkday.breaks.map((b, i) => (
+                <span key={b.id}>
+                  {i > 0 && ", "}
+                  {b.endedAt ? (
+                    <button type="button" className="link-button" onClick={() => setEditingBreak(b)}>
+                      {formatDuration(Math.round(breakSeconds(b, now)))}
+                    </button>
+                  ) : (
+                    formatDuration(Math.round(breakSeconds(b, now)))
+                  )}
+                </span>
+              ))}{" "}
+              ({formatDuration(breaksToday)} total today)
+            </>
+          ) : (
+            `${formatDuration(breaksToday)} today`
+          )}
         </p>
+      )}
+      {editingBreak && (
+        <EditBreakForm brk={editingBreak} onClose={() => setEditingBreak(null)} onSaved={onBreakUpdated} />
       )}
       {(activeWorkday || dailySummary) && (
         <p className="workday-summary">

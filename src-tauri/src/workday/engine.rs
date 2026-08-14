@@ -15,6 +15,14 @@ pub enum WorkdayError {
     BreakAlreadyRunning,
     #[error("no break is currently running")]
     BreakNotRunning,
+    #[error("no break exists with that id")]
+    BreakNotFound,
+    #[error("cannot edit the currently running break — stop it first")]
+    CannotEditRunningBreak,
+    #[error("break end time must be after its start time")]
+    InvalidBreakBounds,
+    #[error("break must stay within its workday's time span")]
+    BreakOutsideWorkday,
     #[error(transparent)]
     Db(#[from] rusqlite::Error),
 }
@@ -96,6 +104,36 @@ pub fn start_break(conn: &Connection, now: DateTime<Utc>) -> Result<WorkBreak, W
 pub fn end_break(conn: &Connection, now: DateTime<Utc>) -> Result<WorkBreak, WorkdayError> {
     let running = work_days_repo::get_running_break(conn)?.ok_or(WorkdayError::BreakNotRunning)?;
     Ok(work_days_repo::stop_break(conn, running.id, now)?)
+}
+
+/// Corrects a completed break's start/end (e.g. the user forgot to click "End Break"
+/// promptly, so its recorded duration is too long). Mirrors ADR-0013's rule for the
+/// timer: a break's lifecycle belongs to `start_break`/`end_break` while it's running,
+/// so editing is only allowed once it's closed. The new bounds must stay within the
+/// parent workday's own span, since a break can't logically outlast the day it's part
+/// of — `now` stands in for the workday's `ended_at` while the day itself is still
+/// open, same as elsewhere in this module.
+pub fn update_break(
+    conn: &Connection,
+    id: i64,
+    started_at: DateTime<Utc>,
+    ended_at: DateTime<Utc>,
+    now: DateTime<Utc>,
+) -> Result<WorkBreak, WorkdayError> {
+    let existing = work_days_repo::get_break_by_id(conn, id)?.ok_or(WorkdayError::BreakNotFound)?;
+    if existing.is_running() {
+        return Err(WorkdayError::CannotEditRunningBreak);
+    }
+    if ended_at <= started_at {
+        return Err(WorkdayError::InvalidBreakBounds);
+    }
+    let day = work_days_repo::get_by_id(conn, existing.work_day_id)?
+        .expect("a break's work_day_id always references an existing work_days row");
+    let day_end = day.ended_at.unwrap_or(now);
+    if started_at < day.started_at || ended_at > day_end {
+        return Err(WorkdayError::BreakOutsideWorkday);
+    }
+    Ok(work_days_repo::update_break(conn, id, started_at, ended_at)?)
 }
 
 /// `now` stands in for a break's `ended_at` while it's still open, so an in-progress
@@ -335,6 +373,70 @@ mod tests {
         assert_eq!(summary.worked_seconds, 7 * 3600);
         assert_eq!(summary.logged_seconds, 2 * 3600);
         assert_eq!(summary.diff_seconds, 5 * 3600);
+    }
+
+    #[test]
+    fn update_break_corrects_a_completed_breaks_bounds() {
+        let conn = open_in_memory().unwrap();
+        start_workday(&conn, now()).unwrap();
+        let brk = start_break(&conn, now() + chrono::Duration::minutes(10)).unwrap();
+        let editing_at = now() + chrono::Duration::hours(3);
+        end_break(&conn, editing_at).unwrap(); // forgot to stop it in time
+
+        let corrected_start = now() + chrono::Duration::minutes(10);
+        let corrected_end = now() + chrono::Duration::minutes(25);
+        let updated = update_break(&conn, brk.id, corrected_start, corrected_end, editing_at).unwrap();
+
+        assert_eq!(updated.started_at, corrected_start);
+        assert_eq!(updated.ended_at, Some(corrected_end));
+    }
+
+    #[test]
+    fn update_break_rejects_editing_a_still_running_break() {
+        let conn = open_in_memory().unwrap();
+        start_workday(&conn, now()).unwrap();
+        let brk = start_break(&conn, now()).unwrap();
+
+        let result = update_break(&conn, brk.id, now(), now() + chrono::Duration::minutes(5), now());
+
+        assert!(matches!(result, Err(WorkdayError::CannotEditRunningBreak)));
+    }
+
+    #[test]
+    fn update_break_rejects_end_at_or_before_start() {
+        let conn = open_in_memory().unwrap();
+        start_workday(&conn, now()).unwrap();
+        let brk = start_break(&conn, now()).unwrap();
+        end_break(&conn, now() + chrono::Duration::minutes(30)).unwrap();
+
+        let result = update_break(&conn, brk.id, now(), now(), now());
+
+        assert!(matches!(result, Err(WorkdayError::InvalidBreakBounds)));
+    }
+
+    #[test]
+    fn update_break_rejects_bounds_outside_the_workday() {
+        let conn = open_in_memory().unwrap();
+        start_workday(&conn, now()).unwrap();
+        let brk = start_break(&conn, now() + chrono::Duration::minutes(10)).unwrap();
+        end_break(&conn, now() + chrono::Duration::minutes(30)).unwrap();
+
+        let result = update_break(
+            &conn,
+            brk.id,
+            now() - chrono::Duration::minutes(5), // before the workday even started
+            now() + chrono::Duration::minutes(20),
+            now(),
+        );
+
+        assert!(matches!(result, Err(WorkdayError::BreakOutsideWorkday)));
+    }
+
+    #[test]
+    fn update_break_rejects_an_unknown_id() {
+        let conn = open_in_memory().unwrap();
+        let result = update_break(&conn, 999, now(), now() + chrono::Duration::minutes(5), now());
+        assert!(matches!(result, Err(WorkdayError::BreakNotFound)));
     }
 
     #[test]

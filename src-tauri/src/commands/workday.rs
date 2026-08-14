@@ -1,4 +1,4 @@
-use chrono::{NaiveDate, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use serde::Serialize;
 use tauri::State;
 
@@ -7,6 +7,11 @@ use crate::db::work_days_repo;
 use crate::error::{AppError, AppResult};
 use crate::state::AppState;
 use crate::workday::engine::{self, DailySummary, RangeSummary};
+
+fn parse_dt(s: &str) -> AppResult<DateTime<Utc>> {
+    s.parse::<DateTime<Utc>>()
+        .map_err(|_| AppError::Validation(format!("Invalid date/time: {s}")))
+}
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -88,6 +93,28 @@ pub fn end_break(state: State<'_, AppState>) -> AppResult<WorkBreak> {
     end_break_impl(&state)
 }
 
+fn update_break_impl(
+    state: &AppState,
+    id: i64,
+    started_at: String,
+    ended_at: String,
+) -> AppResult<WorkBreak> {
+    let started_at = parse_dt(&started_at)?;
+    let ended_at = parse_dt(&ended_at)?;
+    let conn = state.db.lock().unwrap();
+    Ok(engine::update_break(&conn, id, started_at, ended_at, Utc::now())?)
+}
+
+#[tauri::command]
+pub fn update_break(
+    state: State<'_, AppState>,
+    id: i64,
+    started_at: String,
+    ended_at: String,
+) -> AppResult<WorkBreak> {
+    update_break_impl(&state, id, started_at, ended_at)
+}
+
 /// `date` (`YYYY-MM-DD`) defaults to today in the local timezone when omitted — see
 /// `workday::engine::local_date`.
 fn get_daily_summary_impl(state: &AppState, date: Option<String>) -> AppResult<DailySummary> {
@@ -136,9 +163,14 @@ pub fn get_month_summary(state: State<'_, AppState>) -> AppResult<RangeSummary> 
 mod tests {
     use super::*;
     use crate::db::connection::open_in_memory;
+    use chrono::TimeZone;
 
     fn setup() -> AppState {
         AppState::new(open_in_memory().unwrap())
+    }
+
+    fn fixed_past() -> DateTime<Utc> {
+        Utc.with_ymd_and_hms(2020, 1, 1, 9, 0, 0).unwrap()
     }
 
     #[test]
@@ -237,6 +269,45 @@ mod tests {
         assert_eq!(summary.from, engine::week_start(today).format("%Y-%m-%d").to_string());
         assert_eq!(summary.to, today.format("%Y-%m-%d").to_string());
         assert_eq!(summary.worked_seconds, 0);
+    }
+
+    #[test]
+    fn update_break_corrects_a_completed_breaks_bounds_through_the_command() {
+        let state = setup();
+        // Fixed, long-past timestamps and a workday that's never been ended, so the
+        // command's internal `Utc::now()` upper bound is trivially satisfied
+        // regardless of how fast this test happens to run.
+        let brk = {
+            let conn = state.db.lock().unwrap();
+            let day = work_days_repo::insert_running(&conn, "2020-01-01", fixed_past()).unwrap();
+            let brk = work_days_repo::insert_break(&conn, day.id, fixed_past() + chrono::Duration::minutes(10))
+                .unwrap();
+            work_days_repo::stop_break(&conn, brk.id, fixed_past() + chrono::Duration::hours(3)).unwrap(); // forgot to stop it in time
+            brk
+        };
+
+        let corrected_start = fixed_past() + chrono::Duration::minutes(10);
+        let corrected_end = fixed_past() + chrono::Duration::minutes(25);
+        let updated =
+            update_break_impl(&state, brk.id, corrected_start.to_rfc3339(), corrected_end.to_rfc3339())
+                .unwrap();
+
+        assert_eq!(updated.ended_at, Some(corrected_end));
+    }
+
+    #[test]
+    fn update_break_rejects_a_malformed_timestamp() {
+        let state = setup();
+        let brk = {
+            let conn = state.db.lock().unwrap();
+            let day = work_days_repo::insert_running(&conn, "2020-01-01", fixed_past()).unwrap();
+            let brk = work_days_repo::insert_break(&conn, day.id, fixed_past()).unwrap();
+            work_days_repo::stop_break(&conn, brk.id, fixed_past() + chrono::Duration::minutes(30)).unwrap();
+            brk
+        };
+
+        let result = update_break_impl(&state, brk.id, "not-a-date".into(), Utc::now().to_rfc3339());
+        assert!(result.is_err());
     }
 
     #[test]

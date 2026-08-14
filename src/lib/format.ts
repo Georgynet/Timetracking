@@ -1,3 +1,16 @@
+export function toDateInput(iso: string): string {
+  return iso.slice(0, 10);
+}
+
+export function toTimeInput(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
+}
+
+export function combine(date: string, time: string): string {
+  return new Date(`${date}T${time}`).toISOString();
+}
+
 export function formatDuration(seconds: number | null): string {
   if (seconds === null) return "—";
   const h = Math.floor(seconds / 3600);

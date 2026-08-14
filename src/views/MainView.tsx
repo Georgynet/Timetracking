@@ -67,6 +67,12 @@ export function MainView({ onReconfigure }: { onReconfigure: () => void }) {
     setHistoryRefreshSignal((n) => n + 1);
   }
 
+  // Editing a break changes the worked-vs-logged comparisons the same way a live
+  // start/end does, so refresh both after a save.
+  async function handleBreakUpdated() {
+    await Promise.all([loadActiveWorkday(), loadPeriodSummaries()]);
+  }
+
   async function handleSync(): Promise<SyncReport> {
     const report = await runSync();
     setSyncReport(report);
@@ -108,6 +114,7 @@ export function MainView({ onReconfigure }: { onReconfigure: () => void }) {
         onEndWorkday={endWorkday}
         onStartBreak={startBreak}
         onEndBreak={endBreak}
+        onBreakUpdated={handleBreakUpdated}
       />
       <TimerWidget
         activeTimer={activeTimer}
