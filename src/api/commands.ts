@@ -103,6 +103,13 @@ export const startBreak = () => invoke<WorkBreak>("start_break");
 
 export const endBreak = () => invoke<WorkBreak>("end_break");
 
+export const updateBreak = (params: { id: number; startedAt: string; endedAt: string }) =>
+  invoke<WorkBreak>("update_break", {
+    id: params.id,
+    startedAt: params.startedAt,
+    endedAt: params.endedAt,
+  });
+
 export const getDailySummary = (date?: string) =>
   invoke<DailySummary>("get_daily_summary", { date: date ?? null });
 

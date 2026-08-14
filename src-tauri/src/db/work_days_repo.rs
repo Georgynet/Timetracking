@@ -89,6 +89,19 @@ pub fn stop_break(conn: &Connection, id: i64, ended_at: DateTime<Utc>) -> rusqli
     Ok(get_break_by_id(conn, id)?.expect("row was just updated"))
 }
 
+pub fn update_break(
+    conn: &Connection,
+    id: i64,
+    started_at: DateTime<Utc>,
+    ended_at: DateTime<Utc>,
+) -> rusqlite::Result<WorkBreak> {
+    conn.execute(
+        "UPDATE work_breaks SET started_at = ?1, ended_at = ?2 WHERE id = ?3",
+        params![started_at, ended_at, id],
+    )?;
+    Ok(get_break_by_id(conn, id)?.expect("row was just updated"))
+}
+
 pub fn breaks_for_day(conn: &Connection, work_day_id: i64) -> rusqlite::Result<Vec<WorkBreak>> {
     let mut stmt =
         conn.prepare("SELECT * FROM work_breaks WHERE work_day_id = ?1 ORDER BY started_at ASC")?;
@@ -145,6 +158,21 @@ mod tests {
         let days = work_days_for_date(&conn, "2026-08-11").unwrap();
         assert_eq!(days.len(), 2);
         assert!(days[0].started_at < days[1].started_at);
+    }
+
+    #[test]
+    fn update_break_overwrites_both_bounds() {
+        let conn = open_in_memory().unwrap();
+        let day = insert_running(&conn, "2026-08-11", now()).unwrap();
+        let brk = insert_break(&conn, day.id, now()).unwrap();
+        stop_break(&conn, brk.id, now() + chrono::Duration::minutes(45)).unwrap();
+
+        let corrected_start = now() + chrono::Duration::minutes(5);
+        let corrected_end = now() + chrono::Duration::minutes(20);
+        let updated = update_break(&conn, brk.id, corrected_start, corrected_end).unwrap();
+
+        assert_eq!(updated.started_at, corrected_start);
+        assert_eq!(updated.ended_at, Some(corrected_end));
     }
 
     #[test]
