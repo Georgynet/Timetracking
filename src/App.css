@@ -499,16 +499,34 @@ label {
 .stats-legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.9em;
+  gap: 0.4em;
   margin-top: 0.75em;
   font-size: 0.85em;
-  color: var(--muted);
 }
 
 .stats-legend-item {
   display: flex;
   align-items: center;
   gap: 0.35em;
+  background: none;
+  border: none;
+  padding: 0.15em 0.35em;
+  border-radius: 4px;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+}
+
+/* Scoped under `.stats-legend` purely to out-rank the global `button:hover` rule's
+   specificity, so toggling a legend item's hover state is never order-dependent. */
+.stats-legend .stats-legend-item:hover {
+  background: var(--border);
+  color: inherit;
+}
+
+.stats-legend-item-hidden {
+  opacity: 0.45;
+  text-decoration: line-through;
 }
 
 .stats-legend-swatch {

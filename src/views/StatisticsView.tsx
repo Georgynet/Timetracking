@@ -31,6 +31,7 @@ export function StatisticsView({ settings }: StatisticsViewProps) {
   const [ticketTotals, setTicketTotals] = useState<TicketTotal[]>([]);
   const [buckets, setBuckets] = useState<IntervalBucket[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [showEmpty, setShowEmpty] = useState(false);
 
   const { from, to } = rangeForPreset(preset, customFrom, customTo);
 
@@ -55,6 +56,9 @@ export function StatisticsView({ settings }: StatisticsViewProps) {
       cancelled = true;
     };
   }, [from, to, granularity]);
+
+  const visibleBuckets = showEmpty ? buckets : buckets.filter((b) => b.tickets.length > 0 || b.breakSeconds > 0);
+  const emptyPeriodLabel = granularity === "day" ? "days" : granularity === "week" ? "weeks" : "months";
 
   return (
     <div className="stats-view">
@@ -91,8 +95,14 @@ export function StatisticsView({ settings }: StatisticsViewProps) {
       <section className="panel">
         <div className="panel-header">
           <h2>Time by {granularity}</h2>
+          <div className="panel-header-actions">
+            <label className="sprint-toggle">
+              <input type="checkbox" checked={showEmpty} onChange={(e) => setShowEmpty(e.target.checked)} />
+              Show empty {emptyPeriodLabel}
+            </label>
+          </div>
         </div>
-        <IntervalStatsChart buckets={buckets} granularity={granularity} />
+        <IntervalStatsChart buckets={visibleBuckets} granularity={granularity} />
       </section>
 
       <section className="panel">

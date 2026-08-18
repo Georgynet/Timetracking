@@ -1,8 +1,15 @@
 import { format } from "date-fns";
+import { useState } from "react";
 import type { Granularity, IntervalBucket } from "../api/types";
 import { formatDuration } from "../lib/format";
 
-const MAX_DISTINCT_TICKETS = 8;
+const BREAK_KEY = "__break";
+const OTHER_KEY = "__other";
+
+// Only the first 8 tickets by total time get their own validated, distinct hue —
+// beyond that, ticket identity in the *bar* is carried by the neutral "Other" color
+// (the legend still names every ticket individually and each remains toggleable).
+const MAX_DISTINCT_COLORS = 8;
 const SERIES_VARS = [
   "--series-1",
   "--series-2",
@@ -83,48 +90,80 @@ interface IntervalStatsChartProps {
 }
 
 export function IntervalStatsChart({ buckets, granularity }: IntervalStatsChartProps) {
+  // Which tickets/"Break" the user has clicked off in the legend — hidden from both
+  // the stack and the axis scale, but still listed (dimmed) so they can be toggled
+  // back on.
+  const [hidden, setHidden] = useState<Set<string>>(new Set());
+
+  function toggle(key: string) {
+    setHidden((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  /** Bulk-toggles every tail ticket (rank ≥ MAX_DISTINCT_COLORS, sharing the "Other"
+   * bar color) at once: hides all of them if any is currently visible, otherwise
+   * shows them all again. Each still remains individually toggleable afterward. */
+  function toggleOther(tailKeys: string[]) {
+    setHidden((prev) => {
+      const next = new Set(prev);
+      const shouldHide = tailKeys.some((k) => !next.has(k));
+      for (const k of tailKeys) {
+        if (shouldHide) next.add(k);
+        else next.delete(k);
+      }
+      return next;
+    });
+  }
+
   if (buckets.length === 0 || buckets.every((b) => b.tickets.length === 0 && b.breakSeconds === 0)) {
     return <p className="empty-hint">No time logged in this range.</p>;
   }
 
-  // Rank tickets by total seconds across the whole chart, not per bucket — color and
-  // stack position follow the ticket (a fixed identity), never its per-column rank,
-  // so the same ticket lands in the same slot and color in every column.
-  const totalsByTicket = new Map<string, { taskKey: string; seconds: number }>();
+  // Rank every ticket by total seconds across the whole chart, not per bucket —
+  // color and stack position follow the ticket's identity, never its per-column
+  // rank, so the same ticket lands in the same slot and color in every column.
+  const totalsByTicket = new Map<string, number>();
   for (const bucket of buckets) {
     for (const t of bucket.tickets) {
-      const existing = totalsByTicket.get(t.taskKey);
-      totalsByTicket.set(t.taskKey, { taskKey: t.taskKey, seconds: (existing?.seconds ?? 0) + t.seconds });
+      totalsByTicket.set(t.taskKey, (totalsByTicket.get(t.taskKey) ?? 0) + t.seconds);
     }
   }
-  const ranked = [...totalsByTicket.values()].sort((a, b) => b.seconds - a.seconds);
-  const topKeys = ranked.slice(0, MAX_DISTINCT_TICKETS).map((t) => t.taskKey);
-  const hasOther = ranked.length > MAX_DISTINCT_TICKETS;
-  const colorByKey = new Map(topKeys.map((key, i) => [key, `var(${SERIES_VARS[i]})`]));
+  const ranked = [...totalsByTicket.entries()]
+    .map(([taskKey, seconds]) => ({ taskKey, seconds }))
+    .sort((a, b) => b.seconds - a.seconds);
+  const rankByKey = new Map(ranked.map((t, i) => [t.taskKey, i]));
+  const colorForRank = (rank: number) =>
+    rank < MAX_DISTINCT_COLORS ? `var(${SERIES_VARS[rank]})` : "var(--stats-other)";
+  const tailKeys = ranked.slice(MAX_DISTINCT_COLORS).map((t) => t.taskKey);
+  const otherAllHidden = tailKeys.length > 0 && tailKeys.every((k) => hidden.has(k));
 
   function segmentsFor(bucket: IntervalBucket): Segment[] {
     const segments: Segment[] = [];
-    if (bucket.breakSeconds > 0) {
-      segments.push({ key: "__break", label: "Break", seconds: bucket.breakSeconds, color: "var(--stats-break)" });
+    if (bucket.breakSeconds > 0 && !hidden.has(BREAK_KEY)) {
+      segments.push({ key: BREAK_KEY, label: "Break", seconds: bucket.breakSeconds, color: "var(--stats-break)" });
     }
-    let other = 0;
-    for (const key of topKeys) {
-      const seconds = bucket.tickets.find((t) => t.taskKey === key)?.seconds ?? 0;
-      if (seconds > 0) segments.push({ key, label: key, seconds, color: colorByKey.get(key)! });
+    const visible = bucket.tickets.filter((t) => t.seconds > 0 && !hidden.has(t.taskKey));
+    const distinct = visible
+      .filter((t) => (rankByKey.get(t.taskKey) ?? Infinity) < MAX_DISTINCT_COLORS)
+      .sort((a, b) => rankByKey.get(a.taskKey)! - rankByKey.get(b.taskKey)!);
+    for (const t of distinct) {
+      segments.push({ key: t.taskKey, label: t.taskKey, seconds: t.seconds, color: colorForRank(rankByKey.get(t.taskKey)!) });
     }
-    if (hasOther) {
-      for (const t of bucket.tickets) {
-        if (!topKeys.includes(t.taskKey)) other += t.seconds;
-      }
-      if (other > 0) segments.push({ key: "__other", label: "Other", seconds: other, color: "var(--stats-other)" });
+    const otherSeconds = visible
+      .filter((t) => (rankByKey.get(t.taskKey) ?? Infinity) >= MAX_DISTINCT_COLORS)
+      .reduce((sum, t) => sum + t.seconds, 0);
+    if (otherSeconds > 0) {
+      segments.push({ key: OTHER_KEY, label: "Other", seconds: otherSeconds, color: "var(--stats-other)" });
     }
     return segments;
   }
 
-  const maxSeconds = Math.max(
-    ...buckets.map((b) => b.breakSeconds + b.tickets.reduce((sum, t) => sum + t.seconds, 0)),
-    0,
-  );
+  const bucketSegments = buckets.map((b) => segmentsFor(b));
+  const maxSeconds = Math.max(...bucketSegments.map((segs) => segs.reduce((sum, s) => sum + s.seconds, 0)), 0);
   const { max: maxHours, ticks } = yAxisTicks(maxSeconds / 3600);
   const pxPerSecond = PLOT_HEIGHT / (maxHours * 3600);
   const plotBottom = PLOT_TOP + PLOT_HEIGHT;
@@ -157,7 +196,7 @@ export function IntervalStatsChart({ buckets, granularity }: IntervalStatsChartP
             );
           })}
           {buckets.map((bucket, i) => {
-            const segments = segmentsFor(bucket);
+            const segments = bucketSegments[i];
             const x = axisGutter + i * columnSlotWidth + (columnSlotWidth - BAR_WIDTH) / 2;
             let cursor = plotBottom;
             return (
@@ -198,22 +237,36 @@ export function IntervalStatsChart({ buckets, granularity }: IntervalStatsChartP
         </svg>
       </div>
       <div className="stats-legend">
-        {topKeys.map((key, i) => (
-          <span key={key} className="stats-legend-item">
-            <span className="stats-legend-swatch" style={{ background: `var(${SERIES_VARS[i]})` }} />
-            {key}
-          </span>
-        ))}
-        {hasOther && (
-          <span className="stats-legend-item">
-            <span className="stats-legend-swatch" style={{ background: "var(--stats-other)" }} />
-            Other
-          </span>
-        )}
-        <span className="stats-legend-item">
+        <button
+          type="button"
+          className={`stats-legend-item ${hidden.has(BREAK_KEY) ? "stats-legend-item-hidden" : ""}`}
+          onClick={() => toggle(BREAK_KEY)}
+        >
           <span className="stats-legend-swatch" style={{ background: "var(--stats-break)" }} />
           Break
-        </span>
+        </button>
+        {ranked.slice(0, MAX_DISTINCT_COLORS).map((t, i) => (
+          <button
+            type="button"
+            key={t.taskKey}
+            className={`stats-legend-item ${hidden.has(t.taskKey) ? "stats-legend-item-hidden" : ""}`}
+            onClick={() => toggle(t.taskKey)}
+          >
+            <span className="stats-legend-swatch" style={{ background: colorForRank(i) }} />
+            {t.taskKey}
+          </button>
+        ))}
+        {tailKeys.length > 0 && (
+          <button
+            type="button"
+            className={`stats-legend-item ${otherAllHidden ? "stats-legend-item-hidden" : ""}`}
+            onClick={() => toggleOther(tailKeys)}
+            title={`Show/hide the remaining ${tailKeys.length} ticket${tailKeys.length === 1 ? "" : "s"}`}
+          >
+            <span className="stats-legend-swatch" style={{ background: "var(--stats-other)" }} />
+            Other
+          </button>
+        )}
       </div>
     </div>
   );
