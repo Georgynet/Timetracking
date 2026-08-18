@@ -3,9 +3,10 @@ import { isTrayAvailable } from "../api/commands";
 import type { SyncReport } from "../api/types";
 import { useStore } from "../state/store";
 import { FavoritesPanel } from "./FavoritesPanel";
-import { HeaderBar } from "./HeaderBar";
+import { HeaderBar, type MainViewTab } from "./HeaderBar";
 import { HistoryList } from "./HistoryList";
 import { MyTasksPanel } from "./MyTasksPanel";
+import { StatisticsView } from "./StatisticsView";
 import { SyncReportModal } from "./SyncReportModal";
 import { TimerWidget } from "./TimerWidget";
 import { WorkdayWidget } from "./WorkdayWidget";
@@ -38,6 +39,7 @@ export function MainView({ onReconfigure }: { onReconfigure: () => void }) {
   const [trayAvailable, setTrayAvailable] = useState(true);
   const [syncReport, setSyncReport] = useState<SyncReport | null>(null);
   const [historyRefreshSignal, setHistoryRefreshSignal] = useState(0);
+  const [activeView, setActiveView] = useState<MainViewTab>("tracker");
 
   useEffect(() => {
     loadTasks();
@@ -102,46 +104,54 @@ export function MainView({ onReconfigure }: { onReconfigure: () => void }) {
         settings={settings}
         unsyncedCount={unsyncedCount}
         trayAvailable={trayAvailable}
+        activeView={activeView}
+        onChangeView={setActiveView}
         onSync={handleSync}
         onReconfigure={onReconfigure}
       />
-      <WorkdayWidget
-        activeWorkday={activeWorkday}
-        dailySummary={dailySummary}
-        weekSummary={weekSummary}
-        monthSummary={monthSummary}
-        onStartWorkday={startWorkday}
-        onEndWorkday={endWorkday}
-        onStartBreak={startBreak}
-        onEndBreak={endBreak}
-        onBreakUpdated={handleBreakUpdated}
-      />
-      <TimerWidget
-        activeTimer={activeTimer}
-        tasks={allTasks}
-        onStart={handleStartTimer}
-        onStop={handleStopTimer}
-      />
-      <div className="panels-row">
-        <MyTasksPanel
-          tasks={myTasks}
-          jiraBaseUrl={settings.jiraBaseUrl}
-          onRefresh={refreshMyTasks}
-          onStartTimer={handleStartTimer}
-        />
-        <FavoritesPanel
-          tasks={favoriteTasks}
-          jiraBaseUrl={settings.jiraBaseUrl}
-          onChanged={loadTasks}
-          onStartTimer={handleStartTimer}
-        />
-      </div>
-      <HistoryList
-        tasks={allTasks}
-        jiraBaseUrl={settings.jiraBaseUrl}
-        refreshSignal={historyRefreshSignal}
-        onEntriesChanged={handleEntriesChanged}
-      />
+      {activeView === "tracker" ? (
+        <>
+          <WorkdayWidget
+            activeWorkday={activeWorkday}
+            dailySummary={dailySummary}
+            weekSummary={weekSummary}
+            monthSummary={monthSummary}
+            onStartWorkday={startWorkday}
+            onEndWorkday={endWorkday}
+            onStartBreak={startBreak}
+            onEndBreak={endBreak}
+            onBreakUpdated={handleBreakUpdated}
+          />
+          <TimerWidget
+            activeTimer={activeTimer}
+            tasks={allTasks}
+            onStart={handleStartTimer}
+            onStop={handleStopTimer}
+          />
+          <div className="panels-row">
+            <MyTasksPanel
+              tasks={myTasks}
+              jiraBaseUrl={settings.jiraBaseUrl}
+              onRefresh={refreshMyTasks}
+              onStartTimer={handleStartTimer}
+            />
+            <FavoritesPanel
+              tasks={favoriteTasks}
+              jiraBaseUrl={settings.jiraBaseUrl}
+              onChanged={loadTasks}
+              onStartTimer={handleStartTimer}
+            />
+          </div>
+          <HistoryList
+            tasks={allTasks}
+            jiraBaseUrl={settings.jiraBaseUrl}
+            refreshSignal={historyRefreshSignal}
+            onEntriesChanged={handleEntriesChanged}
+          />
+        </>
+      ) : (
+        <StatisticsView settings={settings} />
+      )}
       {syncReport && <SyncReportModal report={syncReport} onClose={() => setSyncReport(null)} />}
     </div>
   );

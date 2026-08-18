@@ -3,15 +3,27 @@ import { useState } from "react";
 import { clearJiraSettings } from "../api/commands";
 import type { SettingsDto, SyncReport } from "../api/types";
 
+export type MainViewTab = "tracker" | "statistics";
+
 interface HeaderBarProps {
   settings: SettingsDto;
   unsyncedCount: number;
   trayAvailable: boolean;
+  activeView: MainViewTab;
+  onChangeView: (view: MainViewTab) => void;
   onSync: () => Promise<SyncReport>;
   onReconfigure: () => void;
 }
 
-export function HeaderBar({ settings, unsyncedCount, trayAvailable, onSync, onReconfigure }: HeaderBarProps) {
+export function HeaderBar({
+  settings,
+  unsyncedCount,
+  trayAvailable,
+  activeView,
+  onChangeView,
+  onSync,
+  onReconfigure,
+}: HeaderBarProps) {
   const [syncing, setSyncing] = useState(false);
   const [lastError, setLastError] = useState<string | null>(null);
 
@@ -47,6 +59,14 @@ export function HeaderBar({ settings, unsyncedCount, trayAvailable, onSync, onRe
             (tray unavailable — status shown here)
           </span>
         )}
+      </div>
+      <div className="view-tabs">
+        <button className={activeView === "tracker" ? "active" : ""} onClick={() => onChangeView("tracker")}>
+          Tracker
+        </button>
+        <button className={activeView === "statistics" ? "active" : ""} onClick={() => onChangeView("statistics")}>
+          Statistics
+        </button>
       </div>
       <div className="header-bar-right">
         {lastError && <span className="error sync-error">{lastError}</span>}

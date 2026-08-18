@@ -95,5 +95,27 @@ export interface RangeSummary {
   diffSeconds: number;
 }
 
+export type Granularity = "day" | "week" | "month";
+
+export interface TicketTotal {
+  taskId: number;
+  taskKey: string;
+  taskSummary: string;
+  totalSeconds: number;
+}
+
+export interface TicketSeconds {
+  taskId: number;
+  taskKey: string;
+  seconds: number;
+}
+
+export interface IntervalBucket {
+  periodStart: string;
+  periodEnd: string;
+  tickets: TicketSeconds[];
+  breakSeconds: number;
+}
+
 /** Tauri commands reject with a plain string (see `error::AppError`'s `Serialize` impl). */
 export type CommandError = string;

@@ -62,7 +62,7 @@ export function FavoritesPanel({ tasks, jiraBaseUrl, onChanged, onStartTimer }: 
       <div className="favorite-search">
         <input
           type="text"
-          placeholder="Search by key (TEAM-1) or free text…"
+          placeholder="Search by key (TEAM-1) or free text in Jira…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleSearch()}

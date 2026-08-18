@@ -2,12 +2,15 @@ import { invoke } from "@tauri-apps/api/core";
 import type {
   ActiveTimer,
   DailySummary,
+  Granularity,
+  IntervalBucket,
   JiraIssue,
   JiraMyself,
   RangeSummary,
   SettingsDto,
   SyncReport,
   Task,
+  TicketTotal,
   TimeEntry,
   WorkBreak,
   WorkDay,
@@ -116,3 +119,13 @@ export const getDailySummary = (date?: string) =>
 export const getWeekSummary = () => invoke<RangeSummary>("get_week_summary");
 
 export const getMonthSummary = () => invoke<RangeSummary>("get_month_summary");
+
+export const getTicketStats = (params: { from: string; to: string }) =>
+  invoke<TicketTotal[]>("get_ticket_stats", { from: params.from, to: params.to });
+
+export const getIntervalStats = (params: { from: string; to: string; granularity: Granularity }) =>
+  invoke<IntervalBucket[]>("get_interval_stats", {
+    from: params.from,
+    to: params.to,
+    granularity: params.granularity,
+  });
