@@ -1,5 +1,6 @@
 pub mod entries;
 pub mod setup;
+pub mod stats;
 pub mod sync;
 pub mod tasks;
 pub mod timer;

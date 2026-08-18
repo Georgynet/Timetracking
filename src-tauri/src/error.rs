@@ -21,6 +21,9 @@ pub enum AppError {
     Workday(#[from] crate::workday::engine::WorkdayError),
 
     #[error("{0}")]
+    Stats(#[from] crate::stats::engine::StatsError),
+
+    #[error("{0}")]
     Validation(String),
 
     #[error("{0}")]

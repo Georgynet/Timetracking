@@ -138,7 +138,10 @@ pub fn update_break(
 
 /// `now` stands in for a break's `ended_at` while it's still open, so an in-progress
 /// break counts against worked time as it happens rather than only once stopped.
-fn break_seconds(breaks: &[WorkBreak], now: DateTime<Utc>) -> i64 {
+///
+/// `pub(crate)` so `stats::engine` can reuse this instead of reimplementing
+/// live-break summing.
+pub(crate) fn break_seconds(breaks: &[WorkBreak], now: DateTime<Utc>) -> i64 {
     breaks
         .iter()
         .map(|b| (b.ended_at.unwrap_or(now) - b.started_at).num_seconds().max(0))
@@ -191,7 +194,10 @@ fn local_instant_utc(naive: chrono::NaiveDateTime) -> DateTime<Utc> {
 
 /// The inclusive local calendar range `[from, to]`, expressed as UTC instant bounds
 /// `[start, end)`, used to select which `time_entries` rows count as "logged" within it.
-fn local_range_bounds_utc(from: NaiveDate, to: NaiveDate) -> (DateTime<Utc>, DateTime<Utc>) {
+///
+/// `pub(crate)` so `stats::engine` can reuse this same local-day → UTC-bounds
+/// conversion (including its DST-fold handling) instead of duplicating it.
+pub(crate) fn local_range_bounds_utc(from: NaiveDate, to: NaiveDate) -> (DateTime<Utc>, DateTime<Utc>) {
     let start = local_instant_utc(from.and_hms_opt(0, 0, 0).unwrap());
     let end = local_instant_utc((to + chrono::Duration::days(1)).and_hms_opt(0, 0, 0).unwrap());
     (start, end)

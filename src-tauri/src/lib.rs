@@ -7,6 +7,7 @@ pub mod jira;
 mod logging;
 mod secrets;
 mod state;
+mod stats;
 mod sync;
 mod timer;
 mod workday;
@@ -81,6 +82,8 @@ pub fn run() {
             commands::workday::get_daily_summary,
             commands::workday::get_week_summary,
             commands::workday::get_month_summary,
+            commands::stats::get_ticket_stats,
+            commands::stats::get_interval_stats,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

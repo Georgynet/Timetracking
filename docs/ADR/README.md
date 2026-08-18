@@ -30,3 +30,4 @@ it instead, so the history of *why* stays intact.
 | [0018](0018-week-and-month-to-date-summaries.md) | Week-to-date and month-to-date summaries, generalized from the daily one | Accepted |
 | [0019](0019-current-sprint-filter-via-dual-jql.md) | "Current sprint" filter for My Tasks via a second best-effort JQL query | Accepted |
 | [0020](0020-editable-completed-breaks.md) | Allow editing a completed break's start/end time | Accepted |
+| [0021](0021-statistics-view-ticket-and-interval-breakdown.md) | Statistics view — per-ticket totals and an interval breakdown chart | Accepted |
