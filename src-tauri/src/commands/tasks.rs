@@ -108,6 +108,19 @@ pub async fn add_favorite_by_key(state: State<'_, AppState>, jira_key: String) -
     Ok(tasks_repo::upsert_favorite_task(&conn, &issue.key, &issue.summary, Utc::now())?)
 }
 
+/// Resolves a ticket found via `search_jira_issues` into a `tasks` row without adding
+/// it to Favorites — used for one-off tickets logged from the manual-entry form (e.g.
+/// an ad-hoc code review) that the user doesn't want to keep around afterwards.
+#[tauri::command]
+pub async fn resolve_task_by_key(state: State<'_, AppState>, jira_key: String) -> AppResult<Task> {
+    let client = state.require_jira_client()?;
+    let jira_key = jira_key.trim().to_uppercase();
+    let issue = client.get_issue(&jira_key).await?;
+
+    let conn = state.db.lock().unwrap();
+    Ok(tasks_repo::upsert_task(&conn, &issue.key, &issue.summary, Utc::now())?)
+}
+
 #[tauri::command]
 pub fn remove_favorite(state: State<'_, AppState>, task_id: i64) -> AppResult<()> {
     let conn = state.db.lock().unwrap();
