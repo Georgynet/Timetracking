@@ -71,6 +71,22 @@ pub fn upsert_assigned_task(
     Ok(get_task_by_key(conn, jira_key)?.expect("row was just upserted"))
 }
 
+/// Inserts a task row if it doesn't exist yet, or refreshes `summary`/`last_synced_at`
+/// otherwise. Never sets `is_favorite`/`is_assigned_to_me` — for one-off ticket lookups
+/// (e.g. logging time against a ticket via manual entry) that shouldn't quietly add the
+/// ticket to Favorites.
+pub fn upsert_task(conn: &Connection, jira_key: &str, summary: &str, now: DateTime<Utc>) -> rusqlite::Result<Task> {
+    conn.execute(
+        "INSERT INTO tasks (jira_key, summary, last_synced_at)
+         VALUES (?1, ?2, ?3)
+         ON CONFLICT(jira_key) DO UPDATE SET
+            summary = excluded.summary,
+            last_synced_at = excluded.last_synced_at",
+        params![jira_key, summary, now],
+    )?;
+    Ok(get_task_by_key(conn, jira_key)?.expect("row was just upserted"))
+}
+
 pub fn upsert_favorite_task(
     conn: &Connection,
     jira_key: &str,
@@ -125,6 +141,29 @@ mod tests {
         assert!(task.is_favorite, "favorite flag must survive a my-tasks refresh");
         assert!(!task.is_assigned_to_me);
         assert!(!task.is_in_current_sprint);
+    }
+
+    #[test]
+    fn upsert_task_never_sets_favorite_or_assigned() {
+        let conn = open_in_memory().unwrap();
+        let task = upsert_task(&conn, "PROJ-1", "Ad-hoc code review", now()).unwrap();
+        assert!(!task.is_favorite);
+        assert!(!task.is_assigned_to_me);
+
+        // Re-running it (e.g. logging a second one-off entry against the same ticket)
+        // must not flip either flag on either.
+        let task = upsert_task(&conn, "PROJ-1", "Ad-hoc code review", now()).unwrap();
+        assert!(!task.is_favorite);
+        assert!(!task.is_assigned_to_me);
+    }
+
+    #[test]
+    fn upsert_task_does_not_clear_an_existing_favorite_flag() {
+        let conn = open_in_memory().unwrap();
+        upsert_favorite_task(&conn, "TEAM-1", "Daily meetings", now()).unwrap();
+
+        let task = upsert_task(&conn, "TEAM-1", "Daily meetings", now()).unwrap();
+        assert!(task.is_favorite, "upsert_task must not un-favorite an already-favorited ticket");
     }
 
     #[test]

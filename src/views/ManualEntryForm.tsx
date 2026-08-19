@@ -1,6 +1,6 @@
 import { FormEvent, useState } from "react";
-import { createManualEntry, updateTimeEntry } from "../api/commands";
-import type { Task, TimeEntry } from "../api/types";
+import { createManualEntry, resolveTaskByKey, searchJiraIssues, updateTimeEntry } from "../api/commands";
+import type { JiraIssue, Task, TimeEntry } from "../api/types";
 import { combine, toDateInput, toTimeInput } from "../lib/format";
 
 interface ManualEntryFormProps {
@@ -10,9 +10,33 @@ interface ManualEntryFormProps {
   onSaved: () => Promise<void>;
 }
 
+/** The entry being edited may reference a one-off ticket (see `resolveTaskByKey`) that
+ * never made it into My Tasks/Favorites, so it wouldn't otherwise appear in `tasks`. */
+function taskFromEntry(entry: TimeEntry): Task {
+  return {
+    id: entry.taskId,
+    jiraKey: entry.taskKey,
+    summary: entry.taskSummary,
+    isFavorite: false,
+    isAssignedToMe: false,
+    isInCurrentSprint: false,
+    lastSyncedAt: null,
+  };
+}
+
 export function ManualEntryForm({ tasks, entry, onClose, onSaved }: ManualEntryFormProps) {
   const now = new Date();
+  // Tickets resolved via the in-form search (or the edited entry's own ticket, if it's
+  // a one-off not already in `tasks`) — merged into the dropdown alongside `tasks`.
+  const [foundTasks, setFoundTasks] = useState<Task[]>(() =>
+    entry && !tasks.some((t) => t.id === entry.taskId) ? [taskFromEntry(entry)] : [],
+  );
   const [taskId, setTaskId] = useState<number | "">(entry?.taskId ?? "");
+  const [showSearch, setShowSearch] = useState(false);
+  const [query, setQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<JiraIssue[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [date, setDate] = useState(entry ? toDateInput(entry.startedAt) : toDateInput(now.toISOString()));
   const [startTime, setStartTime] = useState(
     entry ? toTimeInput(entry.startedAt) : toTimeInput(now.toISOString()),
@@ -25,6 +49,34 @@ export function ManualEntryForm({ tasks, entry, onClose, onSaved }: ManualEntryF
   const [comment, setComment] = useState(entry?.comment ?? "");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  async function handleSearch() {
+    if (!query.trim()) return;
+    setSearching(true);
+    setSearchError(null);
+    try {
+      setSearchResults(await searchJiraIssues(query.trim()));
+    } catch (err) {
+      setSearchError(err as string);
+      setSearchResults([]);
+    } finally {
+      setSearching(false);
+    }
+  }
+
+  async function handleAddTicket(key: string) {
+    setSearchError(null);
+    try {
+      const task = await resolveTaskByKey(key);
+      setFoundTasks((prev) => [...prev.filter((t) => t.id !== task.id), task]);
+      setTaskId(task.id);
+      setShowSearch(false);
+      setQuery("");
+      setSearchResults([]);
+    } catch (err) {
+      setSearchError(err as string);
+    }
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -70,13 +122,60 @@ export function ManualEntryForm({ tasks, entry, onClose, onSaved }: ManualEntryF
           Ticket
           <select value={taskId} onChange={(e) => setTaskId(Number(e.target.value) || "")} required>
             <option value="">Select a ticket…</option>
-            {tasks.map((t) => (
+            {[...tasks, ...foundTasks.filter((f) => !tasks.some((t) => t.id === f.id))].map((t) => (
               <option key={t.id} value={t.id}>
                 {t.jiraKey} — {t.summary}
               </option>
             ))}
           </select>
         </label>
+        {showSearch ? (
+          <div className="ticket-search">
+            <div className="favorite-search">
+              <input
+                type="text"
+                placeholder="Search by key (TEAM-1) or free text in Jira…"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleSearch())}
+                autoFocus
+              />
+              <button type="button" onClick={handleSearch} disabled={searching || !query.trim()}>
+                {searching ? "Searching…" : "Search"}
+              </button>
+              <button
+                type="button"
+                className="link-button"
+                onClick={() => {
+                  setShowSearch(false);
+                  setQuery("");
+                  setSearchResults([]);
+                  setSearchError(null);
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+            {searchError && <p className="error">{searchError}</p>}
+            {searchResults.length > 0 && (
+              <ul className="task-list task-list-capped">
+                {searchResults.map((issue) => (
+                  <li key={issue.key}>
+                    <span className="task-key">{issue.key}</span>
+                    <span className="task-summary">{issue.summary}</span>
+                    <button type="button" onClick={() => handleAddTicket(issue.key)}>
+                      Use
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        ) : (
+          <button type="button" className="link-button" onClick={() => setShowSearch(true)}>
+            Ticket not in the list? Search Jira for a one-off ticket…
+          </button>
+        )}
         <label>
           Date
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />

@@ -38,6 +38,9 @@ export const searchJiraIssues = (query: string) =>
 export const addFavoriteByKey = (jiraKey: string) =>
   invoke<Task>("add_favorite_by_key", { jiraKey });
 
+export const resolveTaskByKey = (jiraKey: string) =>
+  invoke<Task>("resolve_task_by_key", { jiraKey });
+
 export const removeFavorite = (taskId: number) =>
   invoke<void>("remove_favorite", { taskId });
 
