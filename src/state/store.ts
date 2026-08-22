@@ -3,6 +3,7 @@ import * as api from "../api/commands";
 import type {
   ActiveTimer,
   DailySummary,
+  Preferences,
   RangeSummary,
   SettingsDto,
   SyncReport,
@@ -12,6 +13,7 @@ import type {
 
 interface AppStore {
   settings: SettingsDto | null;
+  preferences: Preferences;
   myTasks: Task[];
   favoriteTasks: Task[];
   activeTimer: ActiveTimer | null;
@@ -24,6 +26,8 @@ interface AppStore {
   loading: boolean;
 
   loadSettings: () => Promise<void>;
+  loadPreferences: () => Promise<void>;
+  savePreferences: (next: Preferences) => Promise<void>;
   loadTasks: () => Promise<void>;
   refreshMyTasks: () => Promise<void>;
   loadActiveTimer: () => Promise<void>;
@@ -44,6 +48,9 @@ interface AppStore {
 
 export const useStore = create<AppStore>((set, get) => ({
   settings: null,
+  // Mirrors the backend's defaults so the panels render at a sane size on the very
+  // first paint, before `loadPreferences` has come back.
+  preferences: { myTasksRows: 5, favoritesRows: 4, currentSprintDefault: true },
   myTasks: [],
   favoriteTasks: [],
   activeTimer: null,
@@ -58,6 +65,16 @@ export const useStore = create<AppStore>((set, get) => ({
   loadSettings: async () => {
     const settings = await api.getSettings();
     set({ settings, loading: false });
+  },
+
+  loadPreferences: async () => {
+    const preferences = await api.getPreferences();
+    set({ preferences });
+  },
+
+  savePreferences: async (next) => {
+    const preferences = await api.savePreferences(next);
+    set({ preferences });
   },
 
   loadTasks: async () => {

@@ -6,6 +6,7 @@ import type {
   IntervalBucket,
   JiraIssue,
   JiraMyself,
+  Preferences,
   RangeSummary,
   SettingsDto,
   SyncReport,
@@ -18,6 +19,19 @@ import type {
 } from "./types";
 
 export const getSettings = () => invoke<SettingsDto>("get_settings");
+
+export const getPreferences = () => invoke<Preferences>("get_preferences");
+
+export const savePreferences = (params: {
+  myTasksRows: number;
+  favoritesRows: number;
+  currentSprintDefault: boolean;
+}) =>
+  invoke<Preferences>("save_preferences", {
+    myTasksRows: params.myTasksRows,
+    favoritesRows: params.favoritesRows,
+    currentSprintDefault: params.currentSprintDefault,
+  });
 
 export const saveJiraSettings = (baseUrl: string, email: string, apiToken: string) =>
   invoke<JiraMyself>("save_jira_settings", { baseUrl, email, apiToken });

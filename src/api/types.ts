@@ -27,6 +27,14 @@ export interface ActiveTimer extends TimeEntry {
   isStale: boolean;
 }
 
+/** UI preferences, stored in the app DB (see `commands::preferences`). */
+export interface Preferences {
+  myTasksRows: number;
+  favoritesRows: number;
+  /** Whether My Tasks starts filtered to the current sprint on launch. */
+  currentSprintDefault: boolean;
+}
+
 export interface SettingsDto {
   jiraBaseUrl: string | null;
   jiraEmail: string | null;

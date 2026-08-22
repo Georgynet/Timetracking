@@ -7,6 +7,7 @@ import { HeaderBar, type MainViewTab } from "./HeaderBar";
 import { HistoryList } from "./HistoryList";
 import { MyTasksPanel } from "./MyTasksPanel";
 import { StatisticsView } from "./StatisticsView";
+import { SettingsModal } from "./SettingsModal";
 import { SyncReportModal } from "./SyncReportModal";
 import { TimerWidget } from "./TimerWidget";
 import { WorkdayWidget } from "./WorkdayWidget";
@@ -14,6 +15,7 @@ import { WorkdayWidget } from "./WorkdayWidget";
 export function MainView({ onReconfigure }: { onReconfigure: () => void }) {
   const {
     settings,
+    preferences,
     myTasks,
     favoriteTasks,
     activeTimer,
@@ -22,6 +24,8 @@ export function MainView({ onReconfigure }: { onReconfigure: () => void }) {
     dailySummary,
     weekSummary,
     monthSummary,
+    loadPreferences,
+    savePreferences,
     loadTasks,
     refreshMyTasks,
     loadActiveTimer,
@@ -40,8 +44,10 @@ export function MainView({ onReconfigure }: { onReconfigure: () => void }) {
   const [syncReport, setSyncReport] = useState<SyncReport | null>(null);
   const [historyRefreshSignal, setHistoryRefreshSignal] = useState(0);
   const [activeView, setActiveView] = useState<MainViewTab>("tracker");
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
+    loadPreferences();
     loadTasks();
     loadActiveTimer();
     loadUnsyncedCount();
@@ -107,6 +113,7 @@ export function MainView({ onReconfigure }: { onReconfigure: () => void }) {
         activeView={activeView}
         onChangeView={setActiveView}
         onSync={handleSync}
+        onOpenSettings={() => setSettingsOpen(true)}
         onReconfigure={onReconfigure}
       />
       {activeView === "tracker" ? (
@@ -129,14 +136,20 @@ export function MainView({ onReconfigure }: { onReconfigure: () => void }) {
             onStop={handleStopTimer}
           />
           <div className="panels-row">
+            {/* Remounts when the saved default arrives or changes, so the toggle
+                reflects the preference instead of the value it first rendered with. */}
             <MyTasksPanel
+              key={String(preferences.currentSprintDefault)}
               tasks={myTasks}
               jiraBaseUrl={settings.jiraBaseUrl}
+              rows={preferences.myTasksRows}
+              currentSprintDefault={preferences.currentSprintDefault}
               onRefresh={refreshMyTasks}
               onStartTimer={handleStartTimer}
             />
             <FavoritesPanel
               tasks={favoriteTasks}
+              rows={preferences.favoritesRows}
               jiraBaseUrl={settings.jiraBaseUrl}
               onChanged={loadTasks}
               onStartTimer={handleStartTimer}
@@ -151,6 +164,13 @@ export function MainView({ onReconfigure }: { onReconfigure: () => void }) {
         </>
       ) : (
         <StatisticsView settings={settings} />
+      )}
+      {settingsOpen && (
+        <SettingsModal
+          preferences={preferences}
+          onClose={() => setSettingsOpen(false)}
+          onSave={savePreferences}
+        />
       )}
       {syncReport && <SyncReportModal report={syncReport} onClose={() => setSyncReport(null)} />}
     </div>

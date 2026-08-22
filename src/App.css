@@ -282,6 +282,26 @@ label {
   font-size: 0.9em;
 }
 
+/* Settings modal: a small heading over a group of related fields. */
+.settings-group {
+  margin: 0.75em 0 0.25em;
+  font-size: 0.95em;
+}
+
+/* A checkbox reads as one line, not the stacked label-over-field the form's other
+   fields use — override the global `label` column direction. */
+.settings-check {
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.5em;
+  margin-top: 0.5em;
+}
+
+.settings-check input {
+  width: auto;
+}
+
 /* A count beside a panel heading: part of the heading, but not shouted like it. */
 .panel-count {
   font-weight: 400;
