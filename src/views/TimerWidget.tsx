@@ -82,6 +82,7 @@ export function TimerWidget({ activeTimer, tasks, onStart, onStop }: TimerWidget
         ))}
       </select>
       <input
+        className="timer-start-comment"
         type="text"
         placeholder="Comment (optional)"
         value={comment}
