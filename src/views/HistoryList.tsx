@@ -73,6 +73,10 @@ export function HistoryList({ tasks, jiraBaseUrl, refreshSignal, onEntriesChange
     await onEntriesChanged();
   }
 
+  // Sums the Duration column as shown: a still-running entry contributes nothing,
+  // because its duration isn't decided yet (`durationSeconds` is null until it stops).
+  const totalSeconds = entries.reduce((total, entry) => total + (entry.durationSeconds ?? 0), 0);
+
   return (
     <section className="panel history-panel">
       <div className="panel-header">
@@ -150,6 +154,18 @@ export function HistoryList({ tasks, jiraBaseUrl, refreshSignal, onEntriesChange
               </tr>
             ))}
           </tbody>
+          {/* Counts every row shown for the day, the running entry included — it's a
+              row in the table like any other. The total sits under Duration and adds
+              up the same column: a running entry has no duration yet, so it counts
+              towards Entries but not towards the sum. */}
+          <tfoot>
+            <tr>
+              <th scope="row">Entries</th>
+              <td>{entries.length}</td>
+              <td>{formatDuration(totalSeconds)}</td>
+              <td colSpan={3}></td>
+            </tr>
+          </tfoot>
         </table>
       )}
       {editingEntry !== undefined && (
