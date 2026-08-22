@@ -57,7 +57,9 @@ export function FavoritesPanel({ tasks, jiraBaseUrl, onChanged, onStartTimer }: 
   return (
     <section className="panel">
       <div className="panel-header">
-        <h2>Favorites</h2>
+        <h2>
+          Favorites <span className="panel-count">({tasks.length})</span>
+        </h2>
       </div>
       <div className="favorite-search">
         <input

@@ -282,6 +282,11 @@ label {
   font-size: 0.9em;
 }
 
+/* A count beside a panel heading: part of the heading, but not shouted like it. */
+.panel-count {
+  font-weight: 400;
+}
+
 /* Panels */
 .panels-row {
   display: grid;
