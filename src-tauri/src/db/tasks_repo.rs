@@ -3,6 +3,14 @@ use rusqlite::{params, Connection, OptionalExtension, Row};
 
 use super::models::Task;
 
+/// Every `tasks` column plus `last_tracked_at`, the newest `time_entries.started_at`
+/// filed against the row. A correlated subquery rather than a join + GROUP BY: the
+/// task list is small, and this keeps `SELECT *` semantics for callers that just want
+/// the row back after a write.
+const SELECT_TASK: &str = "SELECT tasks.*, \
+     (SELECT MAX(started_at) FROM time_entries WHERE time_entries.task_id = tasks.id) \
+     AS last_tracked_at FROM tasks";
+
 fn row_to_task(row: &Row) -> rusqlite::Result<Task> {
     Ok(Task {
         id: row.get("id")?,
@@ -12,12 +20,18 @@ fn row_to_task(row: &Row) -> rusqlite::Result<Task> {
         is_assigned_to_me: row.get("is_assigned_to_me")?,
         is_in_current_sprint: row.get("is_in_current_sprint")?,
         last_synced_at: row.get("last_synced_at")?,
+        last_tracked_at: row.get("last_tracked_at")?,
     })
+}
+
+pub fn get_task_by_id(conn: &Connection, id: i64) -> rusqlite::Result<Option<Task>> {
+    conn.query_row(&format!("{SELECT_TASK} WHERE id = ?1"), params![id], row_to_task)
+        .optional()
 }
 
 pub fn get_task_by_key(conn: &Connection, jira_key: &str) -> rusqlite::Result<Option<Task>> {
     conn.query_row(
-        "SELECT * FROM tasks WHERE jira_key = ?1",
+        &format!("{SELECT_TASK} WHERE jira_key = ?1"),
         params![jira_key],
         row_to_task,
     )
@@ -26,14 +40,14 @@ pub fn get_task_by_key(conn: &Connection, jira_key: &str) -> rusqlite::Result<Op
 
 pub fn list_my_tasks(conn: &Connection) -> rusqlite::Result<Vec<Task>> {
     let mut stmt = conn.prepare(
-        "SELECT * FROM tasks WHERE is_assigned_to_me = 1 ORDER BY jira_key",
+        &format!("{SELECT_TASK} WHERE is_assigned_to_me = 1 ORDER BY jira_key"),
     )?;
     let rows = stmt.query_map([], row_to_task)?;
     rows.collect()
 }
 
 pub fn list_favorite_tasks(conn: &Connection) -> rusqlite::Result<Vec<Task>> {
-    let mut stmt = conn.prepare("SELECT * FROM tasks WHERE is_favorite = 1 ORDER BY jira_key")?;
+    let mut stmt = conn.prepare(&format!("{SELECT_TASK} WHERE is_favorite = 1 ORDER BY jira_key"))?;
     let rows = stmt.query_map([], row_to_task)?;
     rows.collect()
 }
@@ -123,6 +137,25 @@ mod tests {
 
     fn now() -> DateTime<Utc> {
         Utc.with_ymd_and_hms(2026, 8, 10, 12, 0, 0).unwrap()
+    }
+
+    #[test]
+    fn last_tracked_at_follows_the_newest_time_entry() {
+        use crate::db::time_entries_repo;
+
+        let conn = open_in_memory().unwrap();
+        let task = upsert_favorite_task(&conn, "PROJ-1", "Ticket", now()).unwrap();
+        assert!(
+            get_task_by_id(&conn, task.id).unwrap().unwrap().last_tracked_at.is_none(),
+            "a never-tracked ticket has no last-tracked time"
+        );
+
+        let later = now() + chrono::Duration::hours(3);
+        time_entries_repo::insert_manual(&conn, task.id, now(), now(), 60, None).unwrap();
+        time_entries_repo::insert_manual(&conn, task.id, later, later, 60, None).unwrap();
+
+        let reloaded = get_task_by_id(&conn, task.id).unwrap().unwrap();
+        assert_eq!(reloaded.last_tracked_at, Some(later), "the newest entry wins");
     }
 
     #[test]

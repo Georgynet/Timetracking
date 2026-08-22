@@ -6,14 +6,21 @@ import { jiraIssueUrl } from "../lib/jira";
 interface MyTasksPanelProps {
   tasks: Task[];
   jiraBaseUrl: string;
+  /** How many entries to show before the list scrolls (see Settings). */
+  rows: number;
+  /** Whether the sprint filter starts ticked (see Settings). */
+  currentSprintDefault: boolean;
   onRefresh: () => Promise<void>;
   onStartTimer: (taskId: number) => Promise<void>;
 }
 
-export function MyTasksPanel({ tasks, jiraBaseUrl, onRefresh, onStartTimer }: MyTasksPanelProps) {
+export function MyTasksPanel({ tasks, jiraBaseUrl, rows, currentSprintDefault, onRefresh, onStartTimer }: MyTasksPanelProps) {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [currentSprintOnly, setCurrentSprintOnly] = useState(false);
+  // Seeded from the saved preference, which defaults to on: the current sprint is
+  // what's being worked on almost every time, and the full assigned list buries it.
+  // Unticking is a per-session look at everything; the preference decides each launch.
+  const [currentSprintOnly, setCurrentSprintOnly] = useState(currentSprintDefault);
 
   async function handleRefresh() {
     setRefreshing(true);
@@ -32,7 +39,10 @@ export function MyTasksPanel({ tasks, jiraBaseUrl, onRefresh, onStartTimer }: My
   return (
     <section className="panel">
       <div className="panel-header">
-        <h2>My Tasks</h2>
+        {/* The count follows the filter — it counts what's actually listed below. */}
+        <h2>
+          My Tasks <span className="panel-count">({visibleTasks.length})</span>
+        </h2>
         <div className="panel-header-actions">
           <label className="sprint-toggle">
             <input
@@ -51,9 +61,15 @@ export function MyTasksPanel({ tasks, jiraBaseUrl, onRefresh, onStartTimer }: My
       {tasks.length === 0 ? (
         <p className="empty-hint">No assigned tickets loaded yet — click Refresh.</p>
       ) : visibleTasks.length === 0 ? (
-        <p className="empty-hint">No tickets in the current sprint.</p>
+        <p className="empty-hint">
+          No tickets in the current sprint — untick the filter to see everything
+          assigned to you.
+        </p>
       ) : (
-        <ul className="task-list task-list-capped my-tasks-list">
+        <ul
+          className="task-list task-list-capped"
+          style={{ maxHeight: `calc(${rows} * 37px + ${rows - 1} * 0.4em)` }}
+        >
           {visibleTasks.map((t) => (
             <li key={t.id}>
               <a

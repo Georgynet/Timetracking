@@ -54,6 +54,8 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::is_tray_available,
+            commands::preferences::get_preferences,
+            commands::preferences::save_preferences,
             commands::setup::get_settings,
             commands::setup::save_jira_settings,
             commands::setup::test_jira_connection,
