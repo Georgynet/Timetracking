@@ -11,6 +11,14 @@
   --danger: #c0392b;
   --pending: #b8860b;
   --synced: #2e7d32;
+  /* Text drawn *on* an accent fill. No single blue works both as text on a dark
+     background and as a fill under white text, so the pairing is its own token. */
+  --accent-contrast: #ffffff;
+
+  /* Tells the engine to draw native widgets — inputs, selects, checkboxes, date and
+     time pickers, scrollbars — in the matching scheme. Flipped in the dark block. */
+  color-scheme: light;
+  accent-color: var(--accent);
 
   /* Statistics chart — fixed categorical order (never cycled/reassigned by rank),
      plus two neutral (non-hued) slots for "Break" and "Other" so they never read as
@@ -71,7 +79,7 @@ button {
 
 button:hover:not(:disabled) {
   background-color: var(--accent);
-  color: white;
+  color: var(--accent-contrast);
 }
 
 button:disabled {
@@ -191,7 +199,7 @@ label {
 .stats-preset-group button.active:hover,
 .stats-granularity-group button.active:hover {
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-contrast);
 }
 
 .sync-error {
@@ -495,7 +503,7 @@ label {
 .stats-preset-group button.active,
 .stats-granularity-group button.active {
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-contrast);
   border-color: var(--accent);
 }
 
@@ -612,39 +620,63 @@ label {
   overflow-y: auto;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    color: #f6f6f6;
-    background-color: #2f2f2f;
-    --border: #4a4a4a;
-    --panel-bg: #262626;
-    --muted: #a0a0a0;
+/* Dark palette. Scoped to an attribute rather than `prefers-color-scheme` because the
+   theme is a three-way preference (system/light/dark) that JavaScript resolves — see
+   `src/theme.ts` and ADR-0027. Keying the CSS off the resolved value keeps these
+   ~20 declarations in one place instead of once per selector path. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  color: #f6f6f6;
+  background-color: #2f2f2f;
+  --border: #4a4a4a;
+  --panel-bg: #262626;
+  --muted: #a0a0a0;
+  /* Lightened so it clears 4.5:1 as text on the dark panel; the fill's text colour
+     flips to near-black to stay readable on it. */
+  --accent: #7aa2ec;
+  --accent-contrast: #1a1a1a;
+  /* Checked against the page background (#2f2f2f), not just the panel — setup, header
+     sync and statistics errors render straight onto the page. */
+  --danger: #ea766a;
+  --pending: #d9a521;
+  --synced: #66bb6a;
 
-    --series-1: #3987e5;
-    --series-2: #d95926;
-    --series-3: #199e70;
-    --series-4: #c98500;
-    --series-5: #d55181;
-    --series-6: #008300;
-    --series-7: #9085e9;
-    --series-8: #e66767;
-    --stats-break: #b0aea5;
-    --stats-other: #44433f;
-    --chart-gridline: #2c2c2a;
-    --chart-axis-label: #898781;
-  }
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --series-5: #d55181;
+  --series-6: #008300;
+  --series-7: #9085e9;
+  --series-8: #e66767;
+  --stats-break: #b0aea5;
+  --stats-other: #44433f;
+  /* Must be *lighter* than the panel it's drawn on, unlike the light theme's rule —
+     the light value inverted would sit below the background and vanish. */
+  --chart-gridline: #3f3f3c;
+  --chart-axis-label: #9b9992;
+}
 
-  .badge-synced {
-    background: #1b3a24;
-  }
+[data-theme="dark"] .badge-synced {
+  background: #1b3a24;
+}
 
-  .badge-pending {
-    background: #4a3a12;
-  }
+[data-theme="dark"] .badge-pending {
+  background: #4a3a12;
+}
 
-  .badge-running {
-    background: #1e2f4a;
-  }
+[data-theme="dark"] .badge-running {
+  background: #1e2f4a;
+}
+
+/* A 40% scrim barely separates the modal from the page once both are dark, so deepen
+   it and give the modal an edge of its own. */
+[data-theme="dark"] .modal-backdrop {
+  background: rgba(0, 0, 0, 0.6);
+}
+
+[data-theme="dark"] .modal {
+  border: 1px solid var(--border);
 }
 
 @media (max-width: 720px) {

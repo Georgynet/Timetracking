@@ -37,7 +37,11 @@ export interface Preferences {
   currentSprintDefault: boolean;
   /** Ordering for the ticket pickers. */
   ticketOrder: TicketOrder;
+  /** Light, dark, or whatever the OS is set to. */
+  theme: ThemePreference;
 }
+
+export type ThemePreference = "system" | "light" | "dark";
 
 export type TicketOrder = "recent" | "key";
 
