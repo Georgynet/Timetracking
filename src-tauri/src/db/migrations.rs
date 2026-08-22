@@ -5,5 +5,6 @@ pub fn migrations() -> Migrations<'static> {
         M::up(include_str!("../../migrations/001_initial.sql")),
         M::up(include_str!("../../migrations/002_work_days.sql")),
         M::up(include_str!("../../migrations/003_task_sprint_flag.sql")),
+        M::up(include_str!("../../migrations/004_preferences.sql")),
     ])
 }

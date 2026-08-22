@@ -4,7 +4,38 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Tauri + React + Typescript</title>
+    <title>Time Tracker</title>
+    <!--
+      Paints the right background before the JS bundle (and with it App.css) arrives.
+      Without this the webview shows its default white for the first frames, which a
+      user who has chosen Dark sees at every launch. The script mirrors what
+      `src/theme.ts` does — same localStorage key, same fallback to the OS scheme — so
+      the module's own `initTheme()` finds the attribute already correct.
+    -->
+    <style>
+      :root {
+        color-scheme: light;
+        background-color: #f6f6f6;
+      }
+      :root[data-theme="dark"] {
+        color-scheme: dark;
+        background-color: #2f2f2f;
+      }
+    </style>
+    <script>
+      (function () {
+        var theme = null;
+        try {
+          theme = localStorage.getItem("ui.theme");
+        } catch (e) {
+          /* private mode or blocked storage — fall through to the OS scheme */
+        }
+        if (theme !== "light" && theme !== "dark") {
+          theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        }
+        document.documentElement.dataset.theme = theme;
+      })();
+    </script>
   </head>
 
   <body>

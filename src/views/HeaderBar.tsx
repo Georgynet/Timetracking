@@ -12,6 +12,7 @@ interface HeaderBarProps {
   activeView: MainViewTab;
   onChangeView: (view: MainViewTab) => void;
   onSync: () => Promise<SyncReport>;
+  onOpenSettings: () => void;
   onReconfigure: () => void;
 }
 
@@ -22,6 +23,7 @@ export function HeaderBar({
   activeView,
   onChangeView,
   onSync,
+  onOpenSettings,
   onReconfigure,
 }: HeaderBarProps) {
   const [syncing, setSyncing] = useState(false);
@@ -70,6 +72,9 @@ export function HeaderBar({
       </div>
       <div className="header-bar-right">
         {lastError && <span className="error sync-error">{lastError}</span>}
+        <button className="link-button" onClick={onOpenSettings}>
+          Settings
+        </button>
         <button onClick={handleSync} disabled={syncing || unsyncedCount === 0}>
           {syncing ? "Syncing…" : `Sync${unsyncedCount > 0 ? ` (${unsyncedCount})` : ""}`}
         </button>
