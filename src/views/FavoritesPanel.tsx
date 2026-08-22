@@ -85,9 +85,9 @@ export function FavoritesPanel({ tasks, jiraBaseUrl, rows, onChanged, onStartTim
         <p className="empty-hint">No favorites yet — search for a ticket above.</p>
       ) : (
         // Search results and saved favorites share one list — one scrollable area
-        // capped at 4 rows total, rather than two separate capped lists stacked on
-        // top of each other.
-                <ul
+        // sized by the Settings preference, rather than two separate capped lists
+        // stacked on top of each other.
+        <ul
           className="task-list task-list-capped"
           style={{ maxHeight: `calc(${rows} * 37px + ${rows - 1} * 0.4em)` }}
         >

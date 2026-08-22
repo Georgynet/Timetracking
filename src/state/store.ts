@@ -50,7 +50,7 @@ export const useStore = create<AppStore>((set, get) => ({
   settings: null,
   // Mirrors the backend's defaults so the panels render at a sane size on the very
   // first paint, before `loadPreferences` has come back.
-  preferences: { myTasksRows: 5, favoritesRows: 4, currentSprintDefault: true },
+  preferences: { myTasksRows: 5, favoritesRows: 4, currentSprintDefault: true, ticketOrder: "recent" },
   myTasks: [],
   favoriteTasks: [],
   activeTimer: null,

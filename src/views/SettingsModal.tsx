@@ -1,5 +1,5 @@
 import { FormEvent, useState } from "react";
-import type { Preferences } from "../api/types";
+import type { Preferences, TicketOrder } from "../api/types";
 
 interface SettingsModalProps {
   preferences: Preferences;
@@ -8,14 +8,15 @@ interface SettingsModalProps {
 }
 
 /**
- * App preferences. Currently just how tall the two task panels are; the shape is
- * built to grow, since the backing store is a key/value table rather than columns
- * (see ADR-0025).
+ * App preferences — panel heights, the sprint-filter default and picker ordering so
+ * far. The shape is built to grow, since the backing store is a key/value table
+ * rather than columns (see ADR-0025).
  */
 export function SettingsModal({ preferences, onClose, onSave }: SettingsModalProps) {
   const [myTasksRows, setMyTasksRows] = useState(preferences.myTasksRows);
   const [favoritesRows, setFavoritesRows] = useState(preferences.favoritesRows);
   const [currentSprintDefault, setCurrentSprintDefault] = useState(preferences.currentSprintDefault);
+  const [ticketOrder, setTicketOrder] = useState<TicketOrder>(preferences.ticketOrder);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -24,7 +25,7 @@ export function SettingsModal({ preferences, onClose, onSave }: SettingsModalPro
     setSaving(true);
     setError(null);
     try {
-      await onSave({ myTasksRows, favoritesRows, currentSprintDefault });
+      await onSave({ myTasksRows, favoritesRows, currentSprintDefault, ticketOrder });
       onClose();
     } catch (err) {
       setError(err as string);
@@ -72,6 +73,18 @@ export function SettingsModal({ preferences, onClose, onSave }: SettingsModalPro
           />
           Start with "Current sprint" ticked
         </label>
+        <h3 className="settings-group">Ticket picker</h3>
+        <label>
+          Order
+          <select value={ticketOrder} onChange={(e) => setTicketOrder(e.target.value as TicketOrder)}>
+            <option value="recent">Recently tracked first</option>
+            <option value="key">Ticket key (A–Z)</option>
+          </select>
+        </label>
+        <p className="field-hint">
+          Applies to the pickers in the timer and the entry dialogs. Tickets you have
+          never tracked come last, in key order.
+        </p>
         {error && <p className="error">{error}</p>}
         <div className="modal-actions">
           <button type="button" className="link-button" onClick={onClose}>

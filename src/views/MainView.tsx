@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { isTrayAvailable } from "../api/commands";
 import type { SyncReport } from "../api/types";
+import { orderTasks } from "../lib/tasks";
 import { useStore } from "../state/store";
 import { FavoritesPanel } from "./FavoritesPanel";
 import { HeaderBar, type MainViewTab } from "./HeaderBar";
@@ -102,7 +103,10 @@ export function MainView({ onReconfigure }: { onReconfigure: () => void }) {
 
   // Favorites and "my tasks" can overlap (e.g. a favorited ticket that's also
   // assigned to you) — de-dupe by id for the timer's ticket picker and history form.
-  const allTasks = [...myTasks, ...favoriteTasks.filter((f) => !myTasks.some((m) => m.id === f.id))];
+  const allTasks = orderTasks(
+    [...myTasks, ...favoriteTasks.filter((f) => !myTasks.some((m) => m.id === f.id))],
+    preferences.ticketOrder,
+  );
 
   return (
     <div className="main-view">

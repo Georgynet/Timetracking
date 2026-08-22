@@ -66,7 +66,7 @@ export function MyTasksPanel({ tasks, jiraBaseUrl, rows, currentSprintDefault, o
           assigned to you.
         </p>
       ) : (
-                <ul
+        <ul
           className="task-list task-list-capped"
           style={{ maxHeight: `calc(${rows} * 37px + ${rows - 1} * 0.4em)` }}
         >

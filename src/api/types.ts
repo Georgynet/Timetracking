@@ -6,6 +6,8 @@ export interface Task {
   isAssignedToMe: boolean;
   isInCurrentSprint: boolean;
   lastSyncedAt: string | null;
+  /** When a timer was last started on this ticket; null if never tracked. */
+  lastTrackedAt: string | null;
 }
 
 export interface TimeEntry {
@@ -33,7 +35,11 @@ export interface Preferences {
   favoritesRows: number;
   /** Whether My Tasks starts filtered to the current sprint on launch. */
   currentSprintDefault: boolean;
+  /** Ordering for the ticket pickers. */
+  ticketOrder: TicketOrder;
 }
+
+export type TicketOrder = "recent" | "key";
 
 export interface SettingsDto {
   jiraBaseUrl: string | null;
