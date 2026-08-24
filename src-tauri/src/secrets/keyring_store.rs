@@ -1,8 +1,14 @@
 use keyring::Entry;
 
-/// Must match `tauri.conf.json`'s `identifier` — keeps the keychain entry namespaced
-/// to this app specifically.
-const SERVICE_NAME: &str = "com.georg.timetracking";
+/// Based on `tauri.conf.json`'s `identifier` — keeps the keychain entry namespaced to
+/// this app specifically. Suffixed for debug builds so a token saved while running
+/// `tauri dev` can never silently overwrite (or be overwritten by) the release
+/// build's token — mirrors the dev/prod SQLite file split in `lib.rs`.
+const SERVICE_NAME: &str = if cfg!(debug_assertions) {
+    "com.georg.timetracking.dev"
+} else {
+    "com.georg.timetracking"
+};
 const KEYCHAIN_USERNAME: &str = "jira_api_token";
 
 #[derive(Debug, thiserror::Error)]
