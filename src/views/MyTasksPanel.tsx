@@ -13,7 +13,9 @@ interface MyTasksPanelProps {
 export function MyTasksPanel({ tasks, jiraBaseUrl, onRefresh, onStartTimer }: MyTasksPanelProps) {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [currentSprintOnly, setCurrentSprintOnly] = useState(false);
+  // On by default: the current sprint is what's being worked on almost every time,
+  // and the full assigned list is long enough that it buries those tickets.
+  const [currentSprintOnly, setCurrentSprintOnly] = useState(true);
 
   async function handleRefresh() {
     setRefreshing(true);
@@ -32,7 +34,10 @@ export function MyTasksPanel({ tasks, jiraBaseUrl, onRefresh, onStartTimer }: My
   return (
     <section className="panel">
       <div className="panel-header">
-        <h2>My Tasks</h2>
+        {/* The count follows the filter — it counts what's actually listed below. */}
+        <h2>
+          My Tasks <span className="panel-count">({visibleTasks.length})</span>
+        </h2>
         <div className="panel-header-actions">
           <label className="sprint-toggle">
             <input
@@ -51,7 +56,10 @@ export function MyTasksPanel({ tasks, jiraBaseUrl, onRefresh, onStartTimer }: My
       {tasks.length === 0 ? (
         <p className="empty-hint">No assigned tickets loaded yet — click Refresh.</p>
       ) : visibleTasks.length === 0 ? (
-        <p className="empty-hint">No tickets in the current sprint.</p>
+        <p className="empty-hint">
+          No tickets in the current sprint — untick the filter to see everything
+          assigned to you.
+        </p>
       ) : (
         <ul className="task-list task-list-capped my-tasks-list">
           {visibleTasks.map((t) => (
