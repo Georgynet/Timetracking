@@ -209,8 +209,20 @@ label {
   background: var(--panel-bg);
 }
 
+/* A flex item's default `min-width: auto` never shrinks below its intrinsic minimum,
+   and a <select>'s intrinsic minimum is its widest option — with long ticket
+   summaries in the list, the row refused to shrink and pushed the comment field and
+   Start button out through the right edge of the card. `min-width: 0` lets both
+   controls give way instead; the select keeps twice the share of the leftover room,
+   and the comment field keeps a usable floor. */
 .timer-widget select {
-  flex: 1;
+  flex: 2 1 0;
+  min-width: 0;
+}
+
+.timer-start-comment {
+  flex: 1 1 0;
+  min-width: 8em;
 }
 
 .timer-running {
