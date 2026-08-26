@@ -16,7 +16,7 @@ interface SettingsModalProps {
 /**
  * App preferences — panel heights, the sprint-filter default and picker ordering so
  * far. The shape is built to grow, since the backing store is a key/value table
- * rather than columns (see ADR-0025).
+ * rather than columns (see ADR-0026).
  */
 export function SettingsModal({
   preferences,

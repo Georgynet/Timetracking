@@ -67,8 +67,12 @@ export function MainView({ onLoggedOut }: { onLoggedOut: () => void }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [historyRefreshSignal]);
 
-  async function handleStartTimer(taskId: number) {
-    await startTimer(taskId);
+  // `comment` is what the start form's comment field holds. Taking it explicitly
+  // matters: `TimerWidget` has always passed it as a second argument, and a handler
+  // that declares only `taskId` is a valid narrower function as far as TypeScript is
+  // concerned — so the comment was accepted at the call site and then dropped.
+  async function handleStartTimer(taskId: number, comment?: string) {
+    await startTimer(taskId, comment);
     setHistoryRefreshSignal((n) => n + 1);
   }
 

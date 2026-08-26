@@ -1,4 +1,4 @@
-# 0026: Ticket pickers rank by what you last tracked
+# 0027: Ticket pickers rank by what you last tracked
 
 **Status:** Accepted — 2026-08-21
 
@@ -19,7 +19,7 @@ already tracked recently — information the app has locally and was ignoring.
   after them in key order so the tail is predictable rather than arbitrary. It's
   applied to the combined list `MainView` hands the pickers, so the timer and both
   entry dialogs stay consistent with each other.
-- The order is a preference (`ui.ticket_order`, ADR-0025): `recent` (default) or
+- The order is a preference (`ui.ticket_order`, ADR-0026): `recent` (default) or
   `key`. An unknown stored value falls back to the default rather than failing.
 
 ## Consequences

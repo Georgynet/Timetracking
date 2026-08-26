@@ -1,4 +1,4 @@
-# 0025: UI preferences live in a key/value table, behind a Settings modal
+# 0026: UI preferences live in a key/value table, behind a Settings modal
 
 **Status:** Accepted — 2026-08-21
 

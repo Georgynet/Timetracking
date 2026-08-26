@@ -33,7 +33,16 @@ pub fn run() {
                 .app_data_dir()
                 .expect("app data dir should be resolvable");
             std::fs::create_dir_all(&app_dir).expect("could not create app data directory");
-            let db_path = app_dir.join("timetracking.sqlite3");
+            // `cfg!(debug_assertions)` is true for `tauri dev` (debug builds) and false
+            // for `tauri build` (release builds) — using it here keeps dev and prod on
+            // separate SQLite files (and, via `keyring_store`, separate keychain
+            // entries) without needing a dedicated env var or build profile.
+            let db_filename = if cfg!(debug_assertions) {
+                "timetracking-dev.sqlite3"
+            } else {
+                "timetracking.sqlite3"
+            };
+            let db_path = app_dir.join(db_filename);
             let conn = db::connection::open_app_db(&db_path).expect("failed to open/migrate database");
 
             let state = AppState::new(conn);
@@ -49,6 +58,16 @@ pub fn run() {
                 tracing::warn!("system tray unavailable; falling back to window-only mode");
             }
             app.state::<AppState>().set_tray_available(tray_available);
+
+            // Debug builds use a separate db/keychain (see above) but look identical
+            // otherwise — tag the window title so it's obvious at a glance which one
+            // is running, especially with both open side by side.
+            if cfg!(debug_assertions) {
+                if let Some(window) = app.get_webview_window("main") {
+                    let dev_title = format!("{} - DEV", window.title().unwrap_or_default());
+                    let _ = window.set_title(&dev_title);
+                }
+            }
 
             Ok(())
         })
