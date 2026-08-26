@@ -24,11 +24,6 @@ fn row_to_task(row: &Row) -> rusqlite::Result<Task> {
     })
 }
 
-pub fn get_task_by_id(conn: &Connection, id: i64) -> rusqlite::Result<Option<Task>> {
-    conn.query_row(&format!("{SELECT_TASK} WHERE id = ?1"), params![id], row_to_task)
-        .optional()
-}
-
 pub fn get_task_by_key(conn: &Connection, jira_key: &str) -> rusqlite::Result<Option<Task>> {
     conn.query_row(
         &format!("{SELECT_TASK} WHERE jira_key = ?1"),
@@ -146,7 +141,7 @@ mod tests {
         let conn = open_in_memory().unwrap();
         let task = upsert_favorite_task(&conn, "PROJ-1", "Ticket", now()).unwrap();
         assert!(
-            get_task_by_id(&conn, task.id).unwrap().unwrap().last_tracked_at.is_none(),
+            get_task_by_key(&conn, "PROJ-1").unwrap().unwrap().last_tracked_at.is_none(),
             "a never-tracked ticket has no last-tracked time"
         );
 
@@ -154,7 +149,7 @@ mod tests {
         time_entries_repo::insert_manual(&conn, task.id, now(), now(), 60, None).unwrap();
         time_entries_repo::insert_manual(&conn, task.id, later, later, 60, None).unwrap();
 
-        let reloaded = get_task_by_id(&conn, task.id).unwrap().unwrap();
+        let reloaded = get_task_by_key(&conn, "PROJ-1").unwrap().unwrap();
         assert_eq!(reloaded.last_tracked_at, Some(later), "the newest entry wins");
     }
 
