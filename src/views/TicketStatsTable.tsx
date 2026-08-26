@@ -13,6 +13,8 @@ export function TicketStatsTable({ totals, jiraBaseUrl }: TicketStatsTableProps)
     return <p className="empty-hint">No time logged in this range.</p>;
   }
 
+  const totalSeconds = totals.reduce((sum, total) => sum + total.totalSeconds, 0);
+
   return (
     <table className="stats-table">
       <thead>
@@ -42,6 +44,16 @@ export function TicketStatsTable({ totals, jiraBaseUrl }: TicketStatsTableProps)
           </tr>
         ))}
       </tbody>
+      {/* The same summary the History table carries, for the range this view is showing.
+          It counts tickets rather than entries because tickets are what the rows are, and
+          the total sums exactly the column above it. */}
+      <tfoot>
+        <tr>
+          <th scope="row">Tickets</th>
+          <td>{totals.length}</td>
+          <td>{formatDuration(totalSeconds)}</td>
+        </tr>
+      </tfoot>
     </table>
   );
 }

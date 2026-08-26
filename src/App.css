@@ -573,6 +573,13 @@ label {
   border-bottom: 1px solid var(--border);
 }
 
+/* The summary row closes the table off, so it carries no bottom rule of its own —
+   matching the History table's footer. */
+.stats-table tfoot td,
+.stats-table tfoot th {
+  border-bottom: none;
+}
+
 /* Modal */
 .modal-backdrop {
   position: fixed;
