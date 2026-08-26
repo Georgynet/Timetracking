@@ -26,7 +26,7 @@ const DEFAULT_TICKET_ORDER: &str = "recent";
 
 /// Light, dark, or whatever the OS is set to. Stored as the three-way choice, not the
 /// resolved scheme — the frontend resolves "system" and re-resolves it live when the
-/// OS flips (see ADR-0027).
+/// OS flips (see ADR-0029).
 const THEME_VALUES: [&str; 3] = ["system", "light", "dark"];
 const DEFAULT_THEME: &str = "system";
 

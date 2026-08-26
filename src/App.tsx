@@ -24,7 +24,7 @@ function App() {
     return <SetupView onSaved={loadSettings} />;
   }
 
-  return <MainView onReconfigure={loadSettings} />;
+  return <MainView onLoggedOut={loadSettings} />;
 }
 
 export default App;

@@ -7,7 +7,7 @@ const DARK_QUERY = "(prefers-color-scheme: dark)";
 /**
  * Theme application. The preference is three-way (system/light/dark) but the DOM only
  * ever carries the *resolved* scheme as `data-theme="light" | "dark"`, so the
- * stylesheet needs a single dark block rather than one per path (see ADR-0027).
+ * stylesheet needs a single dark block rather than one per path (see ADR-0029).
  *
  * "system" is resolved here rather than by a `prefers-color-scheme` media query so
  * that both paths share those declarations, and re-resolved live by the listener

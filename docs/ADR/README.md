@@ -34,6 +34,8 @@ it instead, so the history of *why* stays intact.
 | [0022](0022-statistics-chart-legend-toggling-and-empty-period-filter.md) | Full, toggleable statistics-chart legend; hide empty periods by default | Accepted |
 | [0023](0023-jira-search-inline-in-manual-entry-form.md) | Search Jira directly from the manual-entry form for tickets outside My Tasks/Favorites | Accepted |
 | [0024](0024-current-sprint-filter-on-by-default.md) | The "current sprint" filter is on by default, and My Tasks shows its count | Accepted |
-| [0025](0025-ui-preferences-in-a-key-value-table.md) | UI preferences live in a key/value table, behind a Settings modal | Accepted |
-| [0026](0026-recency-ordered-ticket-pickers.md) | Ticket pickers rank by what you last tracked | Accepted |
-| [0027](0027-three-way-theme-preference.md) | A three-way theme preference, resolved in JS to a `data-theme` attribute | Accepted |
+| [0025](0025-separate-dev-and-prod-database-and-keychain.md) | Separate SQLite database and keychain entry for dev vs. prod builds | Accepted |
+| [0026](0026-ui-preferences-in-a-key-value-table.md) | UI preferences live in a key/value table, behind a Settings modal | Accepted |
+| [0027](0027-recency-ordered-ticket-pickers.md) | Ticket pickers rank by what you last tracked | Accepted |
+| [0028](0028-logout-lives-in-settings.md) | Disconnecting from Jira lives in Settings and is called "Log out" | Accepted |
+| [0029](0029-three-way-theme-preference.md) | A three-way theme preference, resolved in JS to a `data-theme` attribute | Accepted |

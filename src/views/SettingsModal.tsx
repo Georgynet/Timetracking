@@ -1,18 +1,33 @@
+import { confirm } from "@tauri-apps/plugin-dialog";
 import { FormEvent, useState } from "react";
+import { clearJiraSettings } from "../api/commands";
 import type { Preferences, ThemePreference, TicketOrder } from "../api/types";
 
 interface SettingsModalProps {
   preferences: Preferences;
+  /** Warns before logging out, since Setup has no timer UI to stop it from. */
+  timerRunning: boolean;
+  /** Shown beside Log out, so it's clear which account is about to be disconnected. */
+  jiraEmail: string | null;
   onClose: () => void;
   onSave: (next: Preferences) => Promise<void>;
+  /** Called once the token is cleared, to send the app back to Setup. */
+  onLoggedOut: () => void | Promise<void>;
 }
 
 /**
  * App preferences — panel heights, the sprint default, picker ordering and theme so
  * far. The shape is built to grow, since the backing store is a key/value table
- * rather than columns (see ADR-0025).
+ * rather than columns (see ADR-0026).
  */
-export function SettingsModal({ preferences, onClose, onSave }: SettingsModalProps) {
+export function SettingsModal({
+  preferences,
+  timerRunning,
+  jiraEmail,
+  onClose,
+  onSave,
+  onLoggedOut,
+}: SettingsModalProps) {
   const [myTasksRows, setMyTasksRows] = useState(preferences.myTasksRows);
   const [favoritesRows, setFavoritesRows] = useState(preferences.favoritesRows);
   const [currentSprintDefault, setCurrentSprintDefault] = useState(preferences.currentSprintDefault);
@@ -20,6 +35,7 @@ export function SettingsModal({ preferences, onClose, onSave }: SettingsModalPro
   const [theme, setTheme] = useState<ThemePreference>(preferences.theme);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -35,8 +51,35 @@ export function SettingsModal({ preferences, onClose, onSave }: SettingsModalPro
     }
   }
 
+  /** Deliberately immediate rather than staged behind Save: this isn't a preference, and
+   *  a logout that only took effect on Save would be easy to leave half-done. */
+  async function handleLogout() {
+    const confirmed = await confirm(
+      timerRunning
+        ? "A timer is still running. Logging out returns to setup, where there is no way to stop it — it will keep counting until you log back in. Log out anyway?"
+        : "Log out of Jira? Your tracked time stays on this machine — you'll need to enter your API token again to sync.",
+      { title: "Log out", kind: "warning" },
+    );
+    if (!confirmed) return;
+    setLoggingOut(true);
+    setError(null);
+    try {
+      await clearJiraSettings();
+      // Awaited: it re-reads settings, and a failure there would otherwise be an
+      // unhandled rejection that leaves this button stuck on "Logging out…".
+      await onLoggedOut();
+    } catch (err) {
+      setError(err as string);
+      setLoggingOut(false);
+    }
+  }
+
+  // Nothing may dismiss the dialog mid-logout: unmounting it would strand the request
+  // with no place left to report a failure, and a failed logout is not a no-op.
+  const busy = saving || loggingOut;
+
   return (
-    <div className="modal-backdrop" onClick={onClose}>
+    <div className="modal-backdrop" onClick={busy ? undefined : onClose}>
       <form className="modal" onClick={(e) => e.stopPropagation()} onSubmit={handleSubmit}>
         <h2>Settings</h2>
         <h3 className="settings-group">Task panels</h3>
@@ -99,12 +142,26 @@ export function SettingsModal({ preferences, onClose, onSave }: SettingsModalPro
           Following the system switches with macOS, including its automatic day/night
           schedule.
         </p>
+        <h3 className="settings-group">Jira connection</h3>
+        <div className="settings-account">
+          <span className="settings-account-email" title={jiraEmail ?? undefined}>
+            {jiraEmail ?? "Not connected"}
+          </span>
+          {/* `type="button"`: inside a form, the default would submit it. */}
+          <button type="button" className="link-button danger" onClick={handleLogout} disabled={loggingOut}>
+            {loggingOut ? "Logging out…" : "Log out"}
+          </button>
+        </div>
+        <p className="field-hint">
+          Logging out clears the API token from the keychain and returns to setup. Time
+          entries and favorites are kept — they live in the local database, not in Jira.
+        </p>
         {error && <p className="error">{error}</p>}
         <div className="modal-actions">
-          <button type="button" className="link-button" onClick={onClose}>
+          <button type="button" className="link-button" onClick={onClose} disabled={busy}>
             Cancel
           </button>
-          <button type="submit" disabled={saving}>
+          <button type="submit" disabled={busy}>
             {saving ? "Saving…" : "Save"}
           </button>
         </div>

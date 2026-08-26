@@ -13,7 +13,8 @@ import { SyncReportModal } from "./SyncReportModal";
 import { TimerWidget } from "./TimerWidget";
 import { WorkdayWidget } from "./WorkdayWidget";
 
-export function MainView({ onReconfigure }: { onReconfigure: () => void }) {
+/** `onLoggedOut` re-reads settings, which drops the app back to Setup once the token is gone. */
+export function MainView({ onLoggedOut }: { onLoggedOut: () => void }) {
   const {
     settings,
     preferences,
@@ -64,8 +65,12 @@ export function MainView({ onReconfigure }: { onReconfigure: () => void }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [historyRefreshSignal]);
 
-  async function handleStartTimer(taskId: number) {
-    await startTimer(taskId);
+  // `comment` is what the start form's comment field holds. Taking it explicitly
+  // matters: `TimerWidget` has always passed it as a second argument, and a handler
+  // that declares only `taskId` is a valid narrower function as far as TypeScript is
+  // concerned — so the comment was accepted at the call site and then dropped.
+  async function handleStartTimer(taskId: number, comment?: string) {
+    await startTimer(taskId, comment);
     setHistoryRefreshSignal((n) => n + 1);
   }
 
@@ -116,7 +121,6 @@ export function MainView({ onReconfigure }: { onReconfigure: () => void }) {
         onChangeView={setActiveView}
         onSync={handleSync}
         onOpenSettings={() => setSettingsOpen(true)}
-        onReconfigure={onReconfigure}
       />
       {activeView === "tracker" ? (
         <>
@@ -170,8 +174,11 @@ export function MainView({ onReconfigure }: { onReconfigure: () => void }) {
       {settingsOpen && (
         <SettingsModal
           preferences={preferences}
+          timerRunning={activeTimer !== null}
+          jiraEmail={settings.jiraEmail}
           onClose={() => setSettingsOpen(false)}
           onSave={savePreferences}
+          onLoggedOut={onLoggedOut}
         />
       )}
       {syncReport && <SyncReportModal report={syncReport} onClose={() => setSyncReport(null)} />}

@@ -1,4 +1,4 @@
-# 0027: A three-way theme preference, resolved in JS to a `data-theme` attribute
+# 0029: A three-way theme preference, resolved in JS to a `data-theme` attribute
 
 **Status:** Accepted — 2026-08-22
 
@@ -56,7 +56,7 @@ Supporting decisions:
   4.3:1 to 5.4:1 — small text is where a borderline value actually hurts.
 - **The theme is applied before the first paint, from `index.html`.** An inline style
   and script there read the same `localStorage` key `theme.ts` writes on every apply.
-  The real value lives in the `preferences` table (ADR-0025) but arrives
+  The real value lives in the `preferences` table (ADR-0026) but arrives
   asynchronously, and the webview paints its default white before any of the app's CSS
   or JS exists — so without this an explicitly-dark user gets a white frame at every
   launch. The duplication of a few values between `index.html`, `theme.ts` and
