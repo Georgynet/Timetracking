@@ -298,6 +298,26 @@ label {
   margin-top: 0.5em;
 }
 
+/* The account row: the connected address on the left, Log out on the right. */
+.settings-account {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1em;
+}
+
+.settings-account-email {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Marks a link-button whose action is destructive, so Log out doesn't read like Cancel. */
+.link-button.danger {
+  color: var(--danger);
+}
+
 .settings-check input {
   width: auto;
 }

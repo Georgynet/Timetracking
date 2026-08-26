@@ -1,10 +1,16 @@
+import { confirm } from "@tauri-apps/plugin-dialog";
 import { FormEvent, useState } from "react";
+import { clearJiraSettings } from "../api/commands";
 import type { Preferences, TicketOrder } from "../api/types";
 
 interface SettingsModalProps {
   preferences: Preferences;
+  /** Shown beside Log out, so it's clear which account is about to be disconnected. */
+  jiraEmail: string | null;
   onClose: () => void;
   onSave: (next: Preferences) => Promise<void>;
+  /** Called once the token is cleared, to send the app back to Setup. */
+  onLoggedOut: () => void;
 }
 
 /**
@@ -12,13 +18,20 @@ interface SettingsModalProps {
  * far. The shape is built to grow, since the backing store is a key/value table
  * rather than columns (see ADR-0025).
  */
-export function SettingsModal({ preferences, onClose, onSave }: SettingsModalProps) {
+export function SettingsModal({
+  preferences,
+  jiraEmail,
+  onClose,
+  onSave,
+  onLoggedOut,
+}: SettingsModalProps) {
   const [myTasksRows, setMyTasksRows] = useState(preferences.myTasksRows);
   const [favoritesRows, setFavoritesRows] = useState(preferences.favoritesRows);
   const [currentSprintDefault, setCurrentSprintDefault] = useState(preferences.currentSprintDefault);
   const [ticketOrder, setTicketOrder] = useState<TicketOrder>(preferences.ticketOrder);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -31,6 +44,25 @@ export function SettingsModal({ preferences, onClose, onSave }: SettingsModalPro
       setError(err as string);
     } finally {
       setSaving(false);
+    }
+  }
+
+  /** Deliberately immediate rather than staged behind Save: this isn't a preference, and
+   *  a logout that only took effect on Save would be easy to leave half-done. */
+  async function handleLogout() {
+    const confirmed = await confirm(
+      "Log out of Jira? Your tracked time stays on this machine — you'll need to enter your API token again to sync.",
+      { title: "Log out", kind: "warning" },
+    );
+    if (!confirmed) return;
+    setLoggingOut(true);
+    setError(null);
+    try {
+      await clearJiraSettings();
+      onLoggedOut();
+    } catch (err) {
+      setError(err as string);
+      setLoggingOut(false);
     }
   }
 
@@ -84,6 +116,18 @@ export function SettingsModal({ preferences, onClose, onSave }: SettingsModalPro
         <p className="field-hint">
           Applies to the pickers in the timer and the entry dialogs. Tickets you have
           never tracked come last, in key order.
+        </p>
+        <h3 className="settings-group">Jira connection</h3>
+        <div className="settings-account">
+          <span className="settings-account-email">{jiraEmail ?? "Not connected"}</span>
+          {/* `type="button"`: inside a form, the default would submit it. */}
+          <button type="button" className="link-button danger" onClick={handleLogout} disabled={loggingOut}>
+            {loggingOut ? "Logging out…" : "Log out"}
+          </button>
+        </div>
+        <p className="field-hint">
+          Logging out clears the API token from the keychain and returns to setup. Time
+          entries and favorites are kept — they live in the local database, not in Jira.
         </p>
         {error && <p className="error">{error}</p>}
         <div className="modal-actions">

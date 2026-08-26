@@ -13,7 +13,8 @@ import { SyncReportModal } from "./SyncReportModal";
 import { TimerWidget } from "./TimerWidget";
 import { WorkdayWidget } from "./WorkdayWidget";
 
-export function MainView({ onReconfigure }: { onReconfigure: () => void }) {
+/** `onLoggedOut` re-reads settings, which drops the app back to Setup once the token is gone. */
+export function MainView({ onLoggedOut }: { onLoggedOut: () => void }) {
   const {
     settings,
     preferences,
@@ -118,7 +119,6 @@ export function MainView({ onReconfigure }: { onReconfigure: () => void }) {
         onChangeView={setActiveView}
         onSync={handleSync}
         onOpenSettings={() => setSettingsOpen(true)}
-        onReconfigure={onReconfigure}
       />
       {activeView === "tracker" ? (
         <>
@@ -172,8 +172,10 @@ export function MainView({ onReconfigure }: { onReconfigure: () => void }) {
       {settingsOpen && (
         <SettingsModal
           preferences={preferences}
+          jiraEmail={settings.jiraEmail}
           onClose={() => setSettingsOpen(false)}
           onSave={savePreferences}
+          onLoggedOut={onLoggedOut}
         />
       )}
       {syncReport && <SyncReportModal report={syncReport} onClose={() => setSyncReport(null)} />}

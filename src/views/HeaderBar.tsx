@@ -1,6 +1,4 @@
-import { confirm } from "@tauri-apps/plugin-dialog";
 import { useState } from "react";
-import { clearJiraSettings } from "../api/commands";
 import type { SettingsDto, SyncReport } from "../api/types";
 
 export type MainViewTab = "tracker" | "statistics";
@@ -13,7 +11,6 @@ interface HeaderBarProps {
   onChangeView: (view: MainViewTab) => void;
   onSync: () => Promise<SyncReport>;
   onOpenSettings: () => void;
-  onReconfigure: () => void;
 }
 
 export function HeaderBar({
@@ -24,7 +21,6 @@ export function HeaderBar({
   onChangeView,
   onSync,
   onOpenSettings,
-  onReconfigure,
 }: HeaderBarProps) {
   const [syncing, setSyncing] = useState(false);
   const [lastError, setLastError] = useState<string | null>(null);
@@ -39,16 +35,6 @@ export function HeaderBar({
     } finally {
       setSyncing(false);
     }
-  }
-
-  async function handleReconfigure() {
-    const confirmed = await confirm("Disconnect from Jira and re-enter your credentials?", {
-      title: "Reconfigure Jira",
-      kind: "warning",
-    });
-    if (!confirmed) return;
-    await clearJiraSettings();
-    onReconfigure();
   }
 
   return (
@@ -77,9 +63,6 @@ export function HeaderBar({
         </button>
         <button onClick={handleSync} disabled={syncing || unsyncedCount === 0}>
           {syncing ? "Syncing…" : `Sync${unsyncedCount > 0 ? ` (${unsyncedCount})` : ""}`}
-        </button>
-        <button className="link-button" onClick={handleReconfigure}>
-          Reconfigure
         </button>
       </div>
     </header>
