@@ -37,3 +37,4 @@ it instead, so the history of *why* stays intact.
 | [0025](0025-separate-dev-and-prod-database-and-keychain.md) | Separate SQLite database and keychain entry for dev vs. prod builds | Accepted |
 | [0026](0026-ui-preferences-in-a-key-value-table.md) | UI preferences live in a key/value table, behind a Settings modal | Accepted |
 | [0027](0027-recency-ordered-ticket-pickers.md) | Ticket pickers rank by what you last tracked | Accepted |
+| [0028](0028-logout-lives-in-settings.md) | Disconnecting from Jira lives in Settings and is called "Log out" | Accepted |

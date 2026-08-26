@@ -325,9 +325,12 @@ label {
   white-space: nowrap;
 }
 
-/* Marks a link-button whose action is destructive, so Log out doesn't read like Cancel. */
+/* Marks a link-button whose action is destructive. Plain link-buttons already turn
+   `--danger` on hover, which left this indistinguishable from a hovered Cancel — so the
+   destructive one is weighted instead, and carries the colour at rest as well. */
 .link-button.danger {
   color: var(--danger);
+  font-weight: 600;
 }
 
 .settings-check input {

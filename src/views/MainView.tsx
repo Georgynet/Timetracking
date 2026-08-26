@@ -176,6 +176,7 @@ export function MainView({ onLoggedOut }: { onLoggedOut: () => void }) {
       {settingsOpen && (
         <SettingsModal
           preferences={preferences}
+          timerRunning={activeTimer !== null}
           jiraEmail={settings.jiraEmail}
           onClose={() => setSettingsOpen(false)}
           onSave={savePreferences}

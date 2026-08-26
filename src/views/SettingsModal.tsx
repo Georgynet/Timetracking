@@ -5,12 +5,14 @@ import type { Preferences, TicketOrder } from "../api/types";
 
 interface SettingsModalProps {
   preferences: Preferences;
+  /** Warns before logging out, since Setup has no timer UI to stop it from. */
+  timerRunning: boolean;
   /** Shown beside Log out, so it's clear which account is about to be disconnected. */
   jiraEmail: string | null;
   onClose: () => void;
   onSave: (next: Preferences) => Promise<void>;
   /** Called once the token is cleared, to send the app back to Setup. */
-  onLoggedOut: () => void;
+  onLoggedOut: () => void | Promise<void>;
 }
 
 /**
@@ -20,6 +22,7 @@ interface SettingsModalProps {
  */
 export function SettingsModal({
   preferences,
+  timerRunning,
   jiraEmail,
   onClose,
   onSave,
@@ -51,7 +54,9 @@ export function SettingsModal({
    *  a logout that only took effect on Save would be easy to leave half-done. */
   async function handleLogout() {
     const confirmed = await confirm(
-      "Log out of Jira? Your tracked time stays on this machine — you'll need to enter your API token again to sync.",
+      timerRunning
+        ? "A timer is still running. Logging out returns to setup, where there is no way to stop it — it will keep counting until you log back in. Log out anyway?"
+        : "Log out of Jira? Your tracked time stays on this machine — you'll need to enter your API token again to sync.",
       { title: "Log out", kind: "warning" },
     );
     if (!confirmed) return;
@@ -59,15 +64,21 @@ export function SettingsModal({
     setError(null);
     try {
       await clearJiraSettings();
-      onLoggedOut();
+      // Awaited: it re-reads settings, and a failure there would otherwise be an
+      // unhandled rejection that leaves this button stuck on "Logging out…".
+      await onLoggedOut();
     } catch (err) {
       setError(err as string);
       setLoggingOut(false);
     }
   }
 
+  // Nothing may dismiss the dialog mid-logout: unmounting it would strand the request
+  // with no place left to report a failure, and a failed logout is not a no-op.
+  const busy = saving || loggingOut;
+
   return (
-    <div className="modal-backdrop" onClick={onClose}>
+    <div className="modal-backdrop" onClick={busy ? undefined : onClose}>
       <form className="modal" onClick={(e) => e.stopPropagation()} onSubmit={handleSubmit}>
         <h2>Settings</h2>
         <h3 className="settings-group">Task panels</h3>
@@ -119,7 +130,9 @@ export function SettingsModal({
         </p>
         <h3 className="settings-group">Jira connection</h3>
         <div className="settings-account">
-          <span className="settings-account-email">{jiraEmail ?? "Not connected"}</span>
+          <span className="settings-account-email" title={jiraEmail ?? undefined}>
+            {jiraEmail ?? "Not connected"}
+          </span>
           {/* `type="button"`: inside a form, the default would submit it. */}
           <button type="button" className="link-button danger" onClick={handleLogout} disabled={loggingOut}>
             {loggingOut ? "Logging out…" : "Log out"}
@@ -131,10 +144,10 @@ export function SettingsModal({
         </p>
         {error && <p className="error">{error}</p>}
         <div className="modal-actions">
-          <button type="button" className="link-button" onClick={onClose}>
+          <button type="button" className="link-button" onClick={onClose} disabled={busy}>
             Cancel
           </button>
-          <button type="submit" disabled={saving}>
+          <button type="submit" disabled={busy}>
             {saving ? "Saving…" : "Save"}
           </button>
         </div>

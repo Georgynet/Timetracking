@@ -78,13 +78,22 @@ pub async fn test_jira_connection(state: State<'_, AppState>) -> AppResult<JiraM
     Ok(client.get_myself().await?)
 }
 
+/// Logs out: drops the token, then the settings row, then the in-memory client.
+///
+/// The token goes first deliberately. Clearing settings first and then failing to delete
+/// the token (a locked keychain, or no Secret Service provider on Linux) would leave the
+/// credential behind with nothing pointing at it: the session keeps working, and the next
+/// launch finds no settings row and drops silently to Setup with the token stranded in
+/// the keychain. Failing on the token first leaves everything as it was, which is a state
+/// the user can see and retry from — the same rollback discipline `save_jira_settings`
+/// has.
 #[tauri::command]
 pub fn clear_jira_settings(state: State<'_, AppState>) -> AppResult<()> {
+    keyring_store::delete_token()?;
     {
         let conn = state.db.lock().unwrap();
         settings_repo::clear_settings(&conn)?;
     }
-    keyring_store::delete_token()?;
     state.clear_jira_client();
     Ok(())
 }
