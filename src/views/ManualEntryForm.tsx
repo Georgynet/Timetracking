@@ -21,6 +21,9 @@ function taskFromEntry(entry: TimeEntry): Task {
     isAssignedToMe: false,
     isInCurrentSprint: false,
     lastSyncedAt: null,
+    // A one-off ticket resolved for this entry: whatever it was last tracked at is
+    // irrelevant here, the dialog only needs it to render in the picker.
+    lastTrackedAt: null,
   };
 }
 

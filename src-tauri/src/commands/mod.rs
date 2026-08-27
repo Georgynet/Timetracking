@@ -1,4 +1,5 @@
 pub mod entries;
+pub mod preferences;
 pub mod setup;
 pub mod stats;
 pub mod sync;

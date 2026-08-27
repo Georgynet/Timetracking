@@ -7,11 +7,13 @@ import { jiraIssueUrl } from "../lib/jira";
 interface FavoritesPanelProps {
   tasks: Task[];
   jiraBaseUrl: string;
+  /** How many entries to show before the list scrolls (see Settings). */
+  rows: number;
   onChanged: () => Promise<void>;
   onStartTimer: (taskId: number) => Promise<void>;
 }
 
-export function FavoritesPanel({ tasks, jiraBaseUrl, onChanged, onStartTimer }: FavoritesPanelProps) {
+export function FavoritesPanel({ tasks, jiraBaseUrl, rows, onChanged, onStartTimer }: FavoritesPanelProps) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<JiraIssue[]>([]);
   const [searching, setSearching] = useState(false);
@@ -83,9 +85,12 @@ export function FavoritesPanel({ tasks, jiraBaseUrl, onChanged, onStartTimer }: 
         <p className="empty-hint">No favorites yet — search for a ticket above.</p>
       ) : (
         // Search results and saved favorites share one list — one scrollable area
-        // capped at 4 rows total, rather than two separate capped lists stacked on
-        // top of each other.
-        <ul className="task-list task-list-capped favorites-list">
+        // sized by the Settings preference, rather than two separate capped lists
+        // stacked on top of each other.
+        <ul
+          className="task-list task-list-capped"
+          style={{ maxHeight: `calc(${rows} * 37px + ${rows - 1} * 0.4em)` }}
+        >
           {results.map((issue) => (
             <li key={`result-${issue.key}`}>
               <span className="task-key">{issue.key}</span>

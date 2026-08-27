@@ -11,6 +11,10 @@ pub struct Task {
     pub is_assigned_to_me: bool,
     pub is_in_current_sprint: bool,
     pub last_synced_at: Option<DateTime<Utc>>,
+    /// When a timer was last started on this ticket (or a manual entry filed against
+    /// it), so the pickers can rank by what the user actually works on. `None` for a
+    /// ticket that has never been tracked.
+    pub last_tracked_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, Serialize)]
