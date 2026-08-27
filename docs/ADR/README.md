@@ -38,3 +38,4 @@ it instead, so the history of *why* stays intact.
 | [0026](0026-ui-preferences-in-a-key-value-table.md) | UI preferences live in a key/value table, behind a Settings modal | Accepted |
 | [0027](0027-recency-ordered-ticket-pickers.md) | Ticket pickers rank by what you last tracked | Accepted |
 | [0028](0028-logout-lives-in-settings.md) | Disconnecting from Jira lives in Settings and is called "Log out" | Accepted |
+| [0029](0029-three-way-theme-preference.md) | A three-way theme preference, resolved in JS to a `data-theme` attribute | Accepted |

@@ -26,7 +26,6 @@ export function MainView({ onLoggedOut }: { onLoggedOut: () => void }) {
     dailySummary,
     weekSummary,
     monthSummary,
-    loadPreferences,
     savePreferences,
     loadTasks,
     refreshMyTasks,
@@ -49,7 +48,6 @@ export function MainView({ onLoggedOut }: { onLoggedOut: () => void }) {
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
-    loadPreferences();
     loadTasks();
     loadActiveTimer();
     loadUnsyncedCount();

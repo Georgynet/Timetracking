@@ -1,7 +1,7 @@
 import { confirm } from "@tauri-apps/plugin-dialog";
 import { FormEvent, useState } from "react";
 import { clearJiraSettings } from "../api/commands";
-import type { Preferences, TicketOrder } from "../api/types";
+import type { Preferences, ThemePreference, TicketOrder } from "../api/types";
 
 interface SettingsModalProps {
   preferences: Preferences;
@@ -16,7 +16,7 @@ interface SettingsModalProps {
 }
 
 /**
- * App preferences — panel heights, the sprint-filter default and picker ordering so
+ * App preferences — panel heights, the sprint default, picker ordering and theme so
  * far. The shape is built to grow, since the backing store is a key/value table
  * rather than columns (see ADR-0026).
  */
@@ -32,6 +32,7 @@ export function SettingsModal({
   const [favoritesRows, setFavoritesRows] = useState(preferences.favoritesRows);
   const [currentSprintDefault, setCurrentSprintDefault] = useState(preferences.currentSprintDefault);
   const [ticketOrder, setTicketOrder] = useState<TicketOrder>(preferences.ticketOrder);
+  const [theme, setTheme] = useState<ThemePreference>(preferences.theme);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -41,7 +42,7 @@ export function SettingsModal({
     setSaving(true);
     setError(null);
     try {
-      await onSave({ myTasksRows, favoritesRows, currentSprintDefault, ticketOrder });
+      await onSave({ myTasksRows, favoritesRows, currentSprintDefault, ticketOrder, theme });
       onClose();
     } catch (err) {
       setError(err as string);
@@ -127,6 +128,19 @@ export function SettingsModal({
         <p className="field-hint">
           Applies to the pickers in the timer and the entry dialogs. Tickets you have
           never tracked come last, in key order.
+        </p>
+        <h3 className="settings-group">Appearance</h3>
+        <label>
+          Theme
+          <select value={theme} onChange={(e) => setTheme(e.target.value as ThemePreference)}>
+            <option value="system">Follow system</option>
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select>
+        </label>
+        <p className="field-hint">
+          Following the system switches with macOS, including its automatic day/night
+          schedule.
         </p>
         <h3 className="settings-group">Jira connection</h3>
         <div className="settings-account">

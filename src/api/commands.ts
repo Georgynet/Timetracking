@@ -11,6 +11,7 @@ import type {
   SettingsDto,
   SyncReport,
   Task,
+  ThemePreference,
   TicketOrder,
   TicketTotal,
   TimeEntry,
@@ -28,12 +29,14 @@ export const savePreferences = (params: {
   favoritesRows: number;
   currentSprintDefault: boolean;
   ticketOrder: TicketOrder;
+  theme: ThemePreference;
 }) =>
   invoke<Preferences>("save_preferences", {
     myTasksRows: params.myTasksRows,
     favoritesRows: params.favoritesRows,
     currentSprintDefault: params.currentSprintDefault,
     ticketOrder: params.ticketOrder,
+    theme: params.theme,
   });
 
 export const saveJiraSettings = (baseUrl: string, email: string, apiToken: string) =>
