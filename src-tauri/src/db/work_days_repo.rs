@@ -102,6 +102,11 @@ pub fn update_break(
     Ok(get_break_by_id(conn, id)?.expect("row was just updated"))
 }
 
+pub fn delete_break(conn: &Connection, id: i64) -> rusqlite::Result<()> {
+    conn.execute("DELETE FROM work_breaks WHERE id = ?1", params![id])?;
+    Ok(())
+}
+
 pub fn breaks_for_day(conn: &Connection, work_day_id: i64) -> rusqlite::Result<Vec<WorkBreak>> {
     let mut stmt =
         conn.prepare("SELECT * FROM work_breaks WHERE work_day_id = ?1 ORDER BY started_at ASC")?;
@@ -173,6 +178,18 @@ mod tests {
 
         assert_eq!(updated.started_at, corrected_start);
         assert_eq!(updated.ended_at, Some(corrected_end));
+    }
+
+    #[test]
+    fn delete_break_removes_the_row() {
+        let conn = open_in_memory().unwrap();
+        let day = insert_running(&conn, "2026-08-11", now()).unwrap();
+        let brk = insert_break(&conn, day.id, now()).unwrap();
+        stop_break(&conn, brk.id, now() + chrono::Duration::minutes(5)).unwrap();
+
+        delete_break(&conn, brk.id).unwrap();
+
+        assert!(get_break_by_id(&conn, brk.id).unwrap().is_none());
     }
 
     #[test]
