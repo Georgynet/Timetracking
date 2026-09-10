@@ -136,6 +136,8 @@ export const updateBreak = (params: { id: number; startedAt: string; endedAt: st
     endedAt: params.endedAt,
   });
 
+export const deleteBreak = (id: number) => invoke<void>("delete_break", { id });
+
 export const getDailySummary = (date?: string) =>
   invoke<DailySummary>("get_daily_summary", { date: date ?? null });
 

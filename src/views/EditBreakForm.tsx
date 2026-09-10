@@ -1,5 +1,6 @@
+import { confirm } from "@tauri-apps/plugin-dialog";
 import { FormEvent, useState } from "react";
-import { updateBreak } from "../api/commands";
+import { deleteBreak, updateBreak } from "../api/commands";
 import type { WorkBreak } from "../api/types";
 import { combine, toDateInput, toTimeInput } from "../lib/format";
 
@@ -35,6 +36,25 @@ export function EditBreakForm({ brk, onClose, onSaved }: EditBreakFormProps) {
     }
   }
 
+  async function handleDelete() {
+    const confirmed = await confirm("Delete this break? This cannot be undone.", {
+      title: "Delete break",
+      kind: "warning",
+    });
+    if (!confirmed) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await deleteBreak(brk.id);
+      await onSaved();
+      onClose();
+    } catch (err) {
+      setError(err as string);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <form className="modal" onClick={(e) => e.stopPropagation()} onSubmit={handleSubmit}>
@@ -53,6 +73,9 @@ export function EditBreakForm({ brk, onClose, onSaved }: EditBreakFormProps) {
         </label>
         {error && <p className="error">{error}</p>}
         <div className="modal-actions">
+          <button type="button" className="link-button" onClick={handleDelete} disabled={saving}>
+            Delete
+          </button>
           <button type="button" className="link-button" onClick={onClose}>
             Cancel
           </button>

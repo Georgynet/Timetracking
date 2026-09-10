@@ -19,6 +19,8 @@ pub enum WorkdayError {
     BreakNotFound,
     #[error("cannot edit the currently running break — stop it first")]
     CannotEditRunningBreak,
+    #[error("cannot delete the currently running break — stop it first")]
+    CannotDeleteRunningBreak,
     #[error("break end time must be after its start time")]
     InvalidBreakBounds,
     #[error("break must stay within its workday's time span")]
@@ -134,6 +136,18 @@ pub fn update_break(
         return Err(WorkdayError::BreakOutsideWorkday);
     }
     Ok(work_days_repo::update_break(conn, id, started_at, ended_at)?)
+}
+
+/// Permanently removes a break — e.g. one started by mistake and stopped right away.
+/// Mirrors `update_break`'s "not currently running" gate (ADR-0020): a break's
+/// lifecycle stays owned exclusively by `start_break`/`end_break`, so a running break
+/// must be stopped before it can be deleted, same as before it can be edited.
+pub fn delete_break(conn: &Connection, id: i64) -> Result<(), WorkdayError> {
+    let existing = work_days_repo::get_break_by_id(conn, id)?.ok_or(WorkdayError::BreakNotFound)?;
+    if existing.is_running() {
+        return Err(WorkdayError::CannotDeleteRunningBreak);
+    }
+    Ok(work_days_repo::delete_break(conn, id)?)
 }
 
 /// `now` stands in for a break's `ended_at` while it's still open, so an in-progress
@@ -442,6 +456,37 @@ mod tests {
     fn update_break_rejects_an_unknown_id() {
         let conn = open_in_memory().unwrap();
         let result = update_break(&conn, 999, now(), now() + chrono::Duration::minutes(5), now());
+        assert!(matches!(result, Err(WorkdayError::BreakNotFound)));
+    }
+
+    #[test]
+    fn delete_break_removes_a_completed_break() {
+        let conn = open_in_memory().unwrap();
+        start_workday(&conn, now()).unwrap();
+        let brk = start_break(&conn, now()).unwrap();
+        end_break(&conn, now() + chrono::Duration::minutes(5)).unwrap();
+
+        delete_break(&conn, brk.id).unwrap();
+
+        assert!(work_days_repo::get_break_by_id(&conn, brk.id).unwrap().is_none());
+    }
+
+    #[test]
+    fn delete_break_rejects_the_still_running_break() {
+        let conn = open_in_memory().unwrap();
+        start_workday(&conn, now()).unwrap();
+        let brk = start_break(&conn, now()).unwrap();
+
+        let result = delete_break(&conn, brk.id);
+
+        assert!(matches!(result, Err(WorkdayError::CannotDeleteRunningBreak)));
+        assert!(work_days_repo::get_break_by_id(&conn, brk.id).unwrap().is_some());
+    }
+
+    #[test]
+    fn delete_break_rejects_an_unknown_id() {
+        let conn = open_in_memory().unwrap();
+        let result = delete_break(&conn, 999);
         assert!(matches!(result, Err(WorkdayError::BreakNotFound)));
     }
 

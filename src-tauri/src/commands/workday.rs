@@ -115,6 +115,16 @@ pub fn update_break(
     update_break_impl(&state, id, started_at, ended_at)
 }
 
+fn delete_break_impl(state: &AppState, id: i64) -> AppResult<()> {
+    let conn = state.db.lock().unwrap();
+    Ok(engine::delete_break(&conn, id)?)
+}
+
+#[tauri::command]
+pub fn delete_break(state: State<'_, AppState>, id: i64) -> AppResult<()> {
+    delete_break_impl(&state, id)
+}
+
 /// `date` (`YYYY-MM-DD`) defaults to today in the local timezone when omitted — see
 /// `workday::engine::local_date`.
 fn get_daily_summary_impl(state: &AppState, date: Option<String>) -> AppResult<DailySummary> {
@@ -308,6 +318,34 @@ mod tests {
 
         let result = update_break_impl(&state, brk.id, "not-a-date".into(), Utc::now().to_rfc3339());
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn delete_break_removes_a_completed_break_through_the_command() {
+        let state = setup();
+        let brk = {
+            let conn = state.db.lock().unwrap();
+            let day = work_days_repo::insert_running(&conn, "2020-01-01", fixed_past()).unwrap();
+            let brk = work_days_repo::insert_break(&conn, day.id, fixed_past()).unwrap();
+            work_days_repo::stop_break(&conn, brk.id, fixed_past() + chrono::Duration::minutes(5)).unwrap();
+            brk
+        };
+
+        delete_break_impl(&state, brk.id).unwrap();
+
+        let conn = state.db.lock().unwrap();
+        assert!(work_days_repo::get_break_by_id(&conn, brk.id).unwrap().is_none());
+    }
+
+    #[test]
+    fn delete_break_rejects_the_running_break_through_the_command() {
+        let state = setup();
+        start_workday_impl(&state).unwrap();
+        let brk = start_break_impl(&state).unwrap();
+
+        let result = delete_break_impl(&state, brk.id);
+
+        assert!(result.is_err(), "the running break must never be deletable");
     }
 
     #[test]
