@@ -1,7 +1,7 @@
 import { FormEvent, useState } from "react";
 import { createManualEntry, resolveTaskByKey, searchJiraIssues, updateTimeEntry } from "../api/commands";
 import type { JiraIssue, Task, TimeEntry } from "../api/types";
-import { combine, toDateInput, toTimeInput } from "../lib/format";
+import { combine, formatDurationInput, parseDurationInput, toDateInput, toTimeInput } from "../lib/format";
 
 interface ManualEntryFormProps {
   tasks: Task[];
@@ -46,8 +46,8 @@ export function ManualEntryForm({ tasks, entry, onClose, onSaved }: ManualEntryF
   );
   const [mode, setMode] = useState<"duration" | "endTime">(entry ? "endTime" : "duration");
   const [endTime, setEndTime] = useState(entry?.endedAt ? toTimeInput(entry.endedAt) : startTime);
-  const [durationMinutes, setDurationMinutes] = useState(
-    entry?.durationSeconds ? Math.round(entry.durationSeconds / 60) : 30,
+  const [durationInput, setDurationInput] = useState(
+    formatDurationInput(entry?.durationSeconds ? Math.round(entry.durationSeconds / 60) : 30),
   );
   const [comment, setComment] = useState(entry?.comment ?? "");
   const [error, setError] = useState<string | null>(null);
@@ -84,6 +84,15 @@ export function ManualEntryForm({ tasks, entry, onClose, onSaved }: ManualEntryF
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (taskId === "") return;
+    let durationMinutes = 0;
+    if (mode === "duration") {
+      const parsed = parseDurationInput(durationInput);
+      if (parsed === null) {
+        setError("Enter a duration like 60m or 1h 35m");
+        return;
+      }
+      durationMinutes = parsed;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -203,12 +212,12 @@ export function ManualEntryForm({ tasks, entry, onClose, onSaved }: ManualEntryF
         </div>
         {mode === "duration" ? (
           <label>
-            Duration (minutes)
+            Duration
             <input
-              type="number"
-              min={1}
-              value={durationMinutes}
-              onChange={(e) => setDurationMinutes(Number(e.target.value))}
+              type="text"
+              placeholder="e.g. 60m or 1h 35m"
+              value={durationInput}
+              onChange={(e) => setDurationInput(e.target.value)}
               required
             />
           </label>
