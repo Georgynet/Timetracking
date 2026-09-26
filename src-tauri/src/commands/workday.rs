@@ -115,6 +115,73 @@ pub fn update_break(
     update_break_impl(&state, id, started_at, ended_at)
 }
 
+fn update_workday_impl(
+    state: &AppState,
+    id: i64,
+    started_at: String,
+    ended_at: String,
+) -> AppResult<WorkDay> {
+    let started_at = parse_dt(&started_at)?;
+    let ended_at = parse_dt(&ended_at)?;
+    let conn = state.db.lock().unwrap();
+    Ok(engine::update_workday(&conn, id, started_at, ended_at)?)
+}
+
+#[tauri::command]
+pub fn update_workday(
+    state: State<'_, AppState>,
+    id: i64,
+    started_at: String,
+    ended_at: String,
+) -> AppResult<WorkDay> {
+    update_workday_impl(&state, id, started_at, ended_at)
+}
+
+/// One `work_days` session plus its own breaks — used to list every session recorded
+/// on a given local calendar date (including already-ended ones) so a forgotten-to-stop
+/// workday, once finally ended (however late), can still be found and corrected via
+/// `update_workday`. The currently active workday is already surfaced by
+/// `get_active_workday`; this is what makes *past* sessions reachable too — for today
+/// (closing the gap ADR-0020 left open for breaks under an already-ended workday) and,
+/// via `date`, for any earlier day too (ADR-0032, superseding the today-only scope
+/// ADR-0031 shipped with).
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkdaySessionDto {
+    #[serde(flatten)]
+    pub day: WorkDay,
+    pub breaks: Vec<WorkBreak>,
+}
+
+/// `date` (`YYYY-MM-DD`) defaults to today in the local timezone when omitted — same
+/// convention as `get_daily_summary`.
+fn get_workday_sessions_impl(state: &AppState, date: Option<String>) -> AppResult<Vec<WorkdaySessionDto>> {
+    let date = match date {
+        Some(s) => {
+            NaiveDate::parse_from_str(&s, "%Y-%m-%d")
+                .map_err(|_| AppError::Validation(format!("Invalid date: {s}")))?;
+            s
+        }
+        None => engine::local_date(Utc::now()).format("%Y-%m-%d").to_string(),
+    };
+    let conn = state.db.lock().unwrap();
+    let days = work_days_repo::work_days_for_date(&conn, &date)?;
+    days.into_iter()
+        .map(|day| {
+            let breaks = work_days_repo::breaks_for_day(&conn, day.id)?;
+            Ok(WorkdaySessionDto { day, breaks })
+        })
+        .collect()
+}
+
+#[tauri::command]
+pub fn get_workday_sessions(
+    state: State<'_, AppState>,
+    date: Option<String>,
+) -> AppResult<Vec<WorkdaySessionDto>> {
+    get_workday_sessions_impl(&state, date)
+}
+
 fn delete_break_impl(state: &AppState, id: i64) -> AppResult<()> {
     let conn = state.db.lock().unwrap();
     Ok(engine::delete_break(&conn, id)?)
@@ -346,6 +413,74 @@ mod tests {
         let result = delete_break_impl(&state, brk.id);
 
         assert!(result.is_err(), "the running break must never be deletable");
+    }
+
+    #[test]
+    fn update_workday_corrects_a_completed_days_bounds_through_the_command() {
+        let state = setup();
+        let day = {
+            let conn = state.db.lock().unwrap();
+            let day = work_days_repo::insert_running(&conn, "2020-01-01", fixed_past()).unwrap();
+            work_days_repo::stop_running(&conn, day.id, fixed_past() + chrono::Duration::hours(20)).unwrap(); // forgot to clock out in time
+            day
+        };
+
+        let corrected_start = fixed_past();
+        let corrected_end = fixed_past() + chrono::Duration::hours(8);
+        let updated =
+            update_workday_impl(&state, day.id, corrected_start.to_rfc3339(), corrected_end.to_rfc3339())
+                .unwrap();
+
+        assert_eq!(updated.ended_at, Some(corrected_end));
+    }
+
+    #[test]
+    fn update_workday_rejects_a_still_running_workday_through_the_command() {
+        let state = setup();
+        let day = start_workday_impl(&state).unwrap();
+
+        let result = update_workday_impl(&state, day.id, Utc::now().to_rfc3339(), Utc::now().to_rfc3339());
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn todays_sessions_lists_an_already_ended_workday_with_its_breaks() {
+        let state = setup();
+        start_workday_impl(&state).unwrap();
+        let brk = start_break_impl(&state).unwrap();
+        end_break_impl(&state).unwrap();
+        end_workday_impl(&state).unwrap();
+
+        let sessions = get_workday_sessions_impl(&state, None).unwrap();
+
+        assert_eq!(sessions.len(), 1);
+        assert!(sessions[0].day.ended_at.is_some());
+        assert_eq!(sessions[0].breaks.len(), 1);
+        assert_eq!(sessions[0].breaks[0].id, brk.id);
+    }
+
+    #[test]
+    fn workday_sessions_for_an_explicit_past_date_lists_that_days_session() {
+        let state = setup();
+        {
+            let conn = state.db.lock().unwrap();
+            let day = work_days_repo::insert_running(&conn, "2020-01-01", fixed_past()).unwrap();
+            work_days_repo::stop_running(&conn, day.id, fixed_past() + chrono::Duration::hours(8)).unwrap();
+        }
+
+        let sessions = get_workday_sessions_impl(&state, Some("2020-01-01".into())).unwrap();
+        assert_eq!(sessions.len(), 1);
+
+        let empty = get_workday_sessions_impl(&state, Some("2020-01-02".into())).unwrap();
+        assert!(empty.is_empty());
+    }
+
+    #[test]
+    fn workday_sessions_rejects_a_malformed_date() {
+        let state = setup();
+        let result = get_workday_sessions_impl(&state, Some("not-a-date".into()));
+        assert!(result.is_err());
     }
 
     #[test]

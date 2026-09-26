@@ -10,6 +10,7 @@ const FAVORITES_ROWS: &str = "ui.favorites_rows";
 const CURRENT_SPRINT_DEFAULT: &str = "ui.current_sprint_default";
 const TICKET_ORDER: &str = "ui.ticket_order";
 const THEME: &str = "ui.theme";
+const WORKDAY_EDITING_ENABLED: &str = "ui.workday_editing_enabled";
 
 /// How many rows each task panel shows before it starts scrolling. Defaults match the
 /// heights the panels had before this was configurable.
@@ -17,6 +18,11 @@ const DEFAULT_MY_TASKS_ROWS: i64 = 5;
 const DEFAULT_FAVORITES_ROWS: i64 = 4;
 /// On by default — the sprint is what's being worked on nearly every time (ADR-0024).
 const DEFAULT_CURRENT_SPRINT: bool = true;
+
+/// Off by default — the past-day sessions nav (ADR-0032) costs the workday widget two
+/// permanent rows of vertical space for a need ("fix a forgotten clock-out from an
+/// earlier day") that comes up rarely, so it's opt-in rather than always shown.
+const DEFAULT_WORKDAY_EDITING_ENABLED: bool = false;
 
 /// Ordering for the ticket pickers. "recent" puts what you last tracked at the top —
 /// the default, since the next thing you track is usually something you tracked
@@ -45,6 +51,10 @@ pub struct PreferencesDto {
     pub ticket_order: String,
     /// `"system"`, `"light"` or `"dark"`.
     pub theme: String,
+    /// Whether `WorkdayWidget` shows the past-day sessions nav (ADR-0032) at all — off
+    /// by default since it's rarely needed and otherwise always costs two rows of
+    /// vertical space.
+    pub workday_editing_enabled: bool,
 }
 
 fn get_preferences_impl(state: &AppState) -> AppResult<PreferencesDto> {
@@ -63,6 +73,11 @@ fn get_preferences_impl(state: &AppState) -> AppResult<PreferencesDto> {
         theme: preferences_repo::get(&conn, THEME)?
             .filter(|v| THEME_VALUES.contains(&v.as_str()))
             .unwrap_or_else(|| DEFAULT_THEME.to_string()),
+        workday_editing_enabled: preferences_repo::get_i64(
+            &conn,
+            WORKDAY_EDITING_ENABLED,
+            DEFAULT_WORKDAY_EDITING_ENABLED as i64,
+        )? != 0,
     })
 }
 
@@ -87,6 +102,7 @@ fn save_preferences_impl(
     current_sprint_default: bool,
     ticket_order: String,
     theme: String,
+    workday_editing_enabled: bool,
 ) -> AppResult<PreferencesDto> {
     check_rows("My Tasks rows", my_tasks_rows)?;
     check_rows("Favorites rows", favorites_rows)?;
@@ -105,6 +121,7 @@ fn save_preferences_impl(
         preferences_repo::set_i64(&conn, CURRENT_SPRINT_DEFAULT, current_sprint_default as i64)?;
         preferences_repo::set(&conn, TICKET_ORDER, &ticket_order)?;
         preferences_repo::set(&conn, THEME, &theme)?;
+        preferences_repo::set_i64(&conn, WORKDAY_EDITING_ENABLED, workday_editing_enabled as i64)?;
     }
     get_preferences_impl(state)
 }
@@ -117,6 +134,7 @@ pub fn save_preferences(
     current_sprint_default: bool,
     ticket_order: String,
     theme: String,
+    workday_editing_enabled: bool,
 ) -> AppResult<PreferencesDto> {
     save_preferences_impl(
         &state,
@@ -125,6 +143,7 @@ pub fn save_preferences(
         current_sprint_default,
         ticket_order,
         theme,
+        workday_editing_enabled,
     )
 }
 
@@ -146,21 +165,25 @@ mod tests {
         assert!(prefs.current_sprint_default, "the sprint filter starts on");
         assert_eq!(prefs.ticket_order, DEFAULT_TICKET_ORDER);
         assert_eq!(prefs.theme, DEFAULT_THEME);
+        assert!(!prefs.workday_editing_enabled, "the past-day sessions nav starts off");
     }
 
     #[test]
     fn saved_row_counts_round_trip() {
         let state = setup();
-        let saved = save_preferences_impl(&state, 10, 12, false, "key".into(), "dark".into()).unwrap();
+        let saved =
+            save_preferences_impl(&state, 10, 12, false, "key".into(), "dark".into(), true).unwrap();
         assert_eq!((saved.my_tasks_rows, saved.favorites_rows), (10, 12));
         assert!(!saved.current_sprint_default);
         assert_eq!(saved.ticket_order, "key");
         assert_eq!(saved.theme, "dark");
+        assert!(saved.workday_editing_enabled);
         let reloaded = get_preferences_impl(&state).unwrap();
         assert_eq!((reloaded.my_tasks_rows, reloaded.favorites_rows), (10, 12));
         assert!(!reloaded.current_sprint_default, "the toggle's default must persist");
         assert_eq!(reloaded.ticket_order, "key");
         assert_eq!(reloaded.theme, "dark", "an explicit theme must persist");
+        assert!(reloaded.workday_editing_enabled, "the toggle must persist too");
     }
 
     #[test]
@@ -179,19 +202,27 @@ mod tests {
     #[test]
     fn out_of_range_row_counts_are_rejected_and_change_nothing() {
         let state = setup();
-        save_preferences_impl(&state, 6, 6, true, "recent".into(), "light".into()).unwrap();
+        save_preferences_impl(&state, 6, 6, true, "recent".into(), "light".into(), false).unwrap();
 
-        assert!(save_preferences_impl(&state, 0, 6, true, "recent".into(), "light".into()).is_err());
         assert!(
-            save_preferences_impl(&state, 6, MAX_ROWS + 1, true, "recent".into(), "light".into())
-                .is_err()
+            save_preferences_impl(&state, 0, 6, true, "recent".into(), "light".into(), false).is_err()
         );
+        assert!(save_preferences_impl(
+            &state,
+            6,
+            MAX_ROWS + 1,
+            true,
+            "recent".into(),
+            "light".into(),
+            false
+        )
+        .is_err());
         assert!(
-            save_preferences_impl(&state, 6, 6, true, "sideways".into(), "light".into()).is_err(),
+            save_preferences_impl(&state, 6, 6, true, "sideways".into(), "light".into(), false).is_err(),
             "an unknown ordering must be rejected, not stored"
         );
         assert!(
-            save_preferences_impl(&state, 6, 6, true, "recent".into(), "neon".into()).is_err(),
+            save_preferences_impl(&state, 6, 6, true, "recent".into(), "neon".into(), false).is_err(),
             "an unknown theme must be rejected, not stored"
         );
 

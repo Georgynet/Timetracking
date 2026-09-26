@@ -33,6 +33,7 @@ export function SettingsModal({
   const [currentSprintDefault, setCurrentSprintDefault] = useState(preferences.currentSprintDefault);
   const [ticketOrder, setTicketOrder] = useState<TicketOrder>(preferences.ticketOrder);
   const [theme, setTheme] = useState<ThemePreference>(preferences.theme);
+  const [workdayEditingEnabled, setWorkdayEditingEnabled] = useState(preferences.workdayEditingEnabled);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -42,7 +43,14 @@ export function SettingsModal({
     setSaving(true);
     setError(null);
     try {
-      await onSave({ myTasksRows, favoritesRows, currentSprintDefault, ticketOrder, theme });
+      await onSave({
+        myTasksRows,
+        favoritesRows,
+        currentSprintDefault,
+        ticketOrder,
+        theme,
+        workdayEditingEnabled,
+      });
       onClose();
     } catch (err) {
       setError(err as string);
@@ -141,6 +149,20 @@ export function SettingsModal({
         <p className="field-hint">
           Following the system switches with macOS, including its automatic day/night
           schedule.
+        </p>
+        <h3 className="settings-group">Workday</h3>
+        <label className="settings-check">
+          <input
+            type="checkbox"
+            checked={workdayEditingEnabled}
+            onChange={(e) => setWorkdayEditingEnabled(e.target.checked)}
+          />
+          Allow editing past workday sessions
+        </label>
+        <p className="field-hint">
+          Adds Prev/Next day navigation and a sessions list to the workday widget, for
+          fixing a forgotten clock-out from an earlier day. Off by default since it costs
+          two rows of space in the widget and the need for it comes up rarely.
         </p>
         <h3 className="settings-group">Jira connection</h3>
         <div className="settings-account">

@@ -23,6 +23,8 @@ export function MainView({ onLoggedOut }: { onLoggedOut: () => void }) {
     activeTimer,
     unsyncedCount,
     activeWorkday,
+    workdaySessions,
+    workdaySessionsDate,
     dailySummary,
     weekSummary,
     monthSummary,
@@ -35,6 +37,7 @@ export function MainView({ onLoggedOut }: { onLoggedOut: () => void }) {
     stopTimer,
     runSync,
     loadActiveWorkday,
+    loadWorkdaySessions,
     loadPeriodSummaries,
     startWorkday,
     endWorkday,
@@ -52,6 +55,7 @@ export function MainView({ onLoggedOut }: { onLoggedOut: () => void }) {
     loadActiveTimer();
     loadUnsyncedCount();
     loadActiveWorkday();
+    loadWorkdaySessions();
     loadPeriodSummaries();
     isTrayAvailable().then(setTrayAvailable);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -83,6 +87,12 @@ export function MainView({ onLoggedOut }: { onLoggedOut: () => void }) {
   // start/end does, so refresh both after a save.
   async function handleBreakUpdated() {
     await Promise.all([loadActiveWorkday(), loadPeriodSummaries()]);
+  }
+
+  // Editing a past session's start/end changes the worked-vs-logged comparisons the
+  // same way a live start/end does, so refresh both, plus the sessions list itself.
+  async function handleWorkdayUpdated() {
+    await Promise.all([loadWorkdaySessions(), loadActiveWorkday(), loadPeriodSummaries()]);
   }
 
   async function handleSync(): Promise<SyncReport> {
@@ -126,6 +136,9 @@ export function MainView({ onLoggedOut }: { onLoggedOut: () => void }) {
         <>
           <WorkdayWidget
             activeWorkday={activeWorkday}
+            workdaySessions={workdaySessions}
+            workdaySessionsDate={workdaySessionsDate}
+            workdayEditingEnabled={preferences.workdayEditingEnabled}
             dailySummary={dailySummary}
             weekSummary={weekSummary}
             monthSummary={monthSummary}
@@ -134,6 +147,8 @@ export function MainView({ onLoggedOut }: { onLoggedOut: () => void }) {
             onStartBreak={startBreak}
             onEndBreak={endBreak}
             onBreakUpdated={handleBreakUpdated}
+            onWorkdayUpdated={handleWorkdayUpdated}
+            onNavigateDate={loadWorkdaySessions}
           />
           <TimerWidget
             activeTimer={activeTimer}

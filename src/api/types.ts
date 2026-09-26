@@ -39,6 +39,9 @@ export interface Preferences {
   ticketOrder: TicketOrder;
   /** Light, dark, or whatever the OS is set to. */
   theme: ThemePreference;
+  /** Whether `WorkdayWidget` shows the past-day sessions nav (ADR-0032) at all — off by
+   *  default, since it costs two rows of vertical space for a need that's rare. */
+  workdayEditingEnabled: boolean;
 }
 
 export type ThemePreference = "system" | "light" | "dark";
@@ -96,6 +99,11 @@ export interface WorkdayStatus extends WorkDay {
   /** Worked/break seconds already banked today from earlier, already-ended sessions. */
   priorWorkedSecondsToday: number;
   priorBreakSecondsToday: number;
+}
+
+/** A single `work_days` session plus its own breaks, as listed by `getWorkdaySessions` for a given date. */
+export interface WorkdaySession extends WorkDay {
+  breaks: WorkBreak[];
 }
 
 export interface DailySummary {

@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import * as api from "../api/commands";
+import { localDateString } from "../lib/format";
 import { applyTheme } from "../theme";
 import type {
   ActiveTimer,
@@ -9,6 +10,7 @@ import type {
   SettingsDto,
   SyncReport,
   Task,
+  WorkdaySession,
   WorkdayStatus,
 } from "../api/types";
 
@@ -21,6 +23,13 @@ interface AppStore {
   unsyncedCount: number;
   lastSyncReport: SyncReport | null;
   activeWorkday: WorkdayStatus | null;
+  /** Every `work_days` session recorded on `workdaySessionsDate`, including
+   *  already-ended ones — lets a forgotten-to-stop workday be found and corrected once
+   *  it's finally ended, for today or any earlier day the widget navigates to. */
+  workdaySessions: WorkdaySession[];
+  /** The local calendar date (`YYYY-MM-DD`) `workdaySessions` was last loaded for;
+   *  defaults to today. */
+  workdaySessionsDate: string;
   dailySummary: DailySummary | null;
   weekSummary: RangeSummary | null;
   monthSummary: RangeSummary | null;
@@ -37,6 +46,9 @@ interface AppStore {
   stopTimer: () => Promise<void>;
   runSync: () => Promise<SyncReport>;
   loadActiveWorkday: () => Promise<void>;
+  /** Reloads `workdaySessions`; `date` defaults to whatever `workdaySessionsDate`
+   *  currently holds (today, unless the widget has navigated elsewhere). */
+  loadWorkdaySessions: (date?: string) => Promise<void>;
   loadDailySummary: () => Promise<void>;
   loadWeekSummary: () => Promise<void>;
   loadMonthSummary: () => Promise<void>;
@@ -57,6 +69,7 @@ export const useStore = create<AppStore>((set, get) => ({
     currentSprintDefault: true,
     ticketOrder: "recent",
     theme: "system",
+    workdayEditingEnabled: false,
   },
   myTasks: [],
   favoriteTasks: [],
@@ -64,6 +77,8 @@ export const useStore = create<AppStore>((set, get) => ({
   unsyncedCount: 0,
   lastSyncReport: null,
   activeWorkday: null,
+  workdaySessions: [],
+  workdaySessionsDate: localDateString(),
   dailySummary: null,
   weekSummary: null,
   monthSummary: null,
@@ -141,6 +156,12 @@ export const useStore = create<AppStore>((set, get) => ({
     set({ activeWorkday });
   },
 
+  loadWorkdaySessions: async (date) => {
+    const targetDate = date ?? get().workdaySessionsDate;
+    const workdaySessions = await api.getWorkdaySessions(targetDate);
+    set({ workdaySessions, workdaySessionsDate: targetDate });
+  },
+
   loadDailySummary: async () => {
     const dailySummary = await api.getDailySummary();
     set({ dailySummary });
@@ -164,7 +185,14 @@ export const useStore = create<AppStore>((set, get) => ({
     try {
       await api.startWorkday();
     } finally {
-      await Promise.all([get().loadActiveWorkday(), get().loadPeriodSummaries()]);
+      // Starting/ending a workday always happens today, regardless of which date the
+      // sessions list is currently navigated to — so reload today's specifically
+      // rather than whatever `workdaySessionsDate` happens to be.
+      await Promise.all([
+        get().loadActiveWorkday(),
+        get().loadPeriodSummaries(),
+        get().loadWorkdaySessions(localDateString()),
+      ]);
     }
   },
 
@@ -172,7 +200,11 @@ export const useStore = create<AppStore>((set, get) => ({
     try {
       await api.endWorkday();
     } finally {
-      await Promise.all([get().loadActiveWorkday(), get().loadPeriodSummaries()]);
+      await Promise.all([
+        get().loadActiveWorkday(),
+        get().loadPeriodSummaries(),
+        get().loadWorkdaySessions(localDateString()),
+      ]);
     }
   },
 

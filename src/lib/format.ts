@@ -1,5 +1,26 @@
+/** The local calendar date (`YYYY-MM-DD`) an ISO timestamp falls on — must stay in sync
+ * with `toTimeInput`, which already reads local (not UTC) hours/minutes; slicing the raw
+ * ISO string here instead would show a date that's off by one from the time next to it
+ * whenever the local offset pushes the instant across a UTC-midnight boundary. */
 export function toDateInput(iso: string): string {
-  return iso.slice(0, 10);
+  return localDateString(new Date(iso));
+}
+
+/** The local calendar date (`YYYY-MM-DD`) for a `Date`, matching the backend's
+ * `work_date` convention (see `workday::engine::local_date`) — the shared helper behind
+ * both `toDateInput` (an ISO timestamp) and day-by-day sessions-date navigation. */
+export function localDateString(d: Date = new Date()): string {
+  const y = d.getFullYear();
+  const m = (d.getMonth() + 1).toString().padStart(2, "0");
+  const day = d.getDate().toString().padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/** Shifts a `YYYY-MM-DD` date string by `days` (positive or negative), preserving local
+ * calendar semantics — used for the workday sessions date navigation. */
+export function shiftDate(dateStr: string, days: number): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return localDateString(new Date(y, m - 1, d + days));
 }
 
 export function toTimeInput(iso: string): string {

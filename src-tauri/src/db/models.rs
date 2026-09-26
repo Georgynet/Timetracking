@@ -56,6 +56,12 @@ pub struct WorkDay {
     pub ended_at: Option<DateTime<Utc>>,
 }
 
+impl WorkDay {
+    pub fn is_running(&self) -> bool {
+        self.ended_at.is_none()
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkBreak {
