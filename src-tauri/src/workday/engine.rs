@@ -25,6 +25,14 @@ pub enum WorkdayError {
     InvalidBreakBounds,
     #[error("break must stay within its workday's time span")]
     BreakOutsideWorkday,
+    #[error("no workday exists with that id")]
+    WorkdayNotFound,
+    #[error("cannot edit the currently running workday — stop it first")]
+    CannotEditRunningWorkday,
+    #[error("workday end time must be after its start time")]
+    InvalidWorkdayBounds,
+    #[error("workday must fully contain its recorded breaks")]
+    WorkdayMustContainBreaks,
     #[error(transparent)]
     Db(#[from] rusqlite::Error),
 }
@@ -90,6 +98,41 @@ pub fn end_workday(conn: &mut Connection, now: DateTime<Utc>) -> Result<WorkDay,
     let day = work_days_repo::stop_running(&tx, running.id, now)?;
     tx.commit()?;
     Ok(day)
+}
+
+/// Corrects a completed workday's start/end (e.g. the user forgot to click "End
+/// Workday" promptly, so its recorded span is far too long). Mirrors `update_break`'s
+/// (ADR-0020) gating: a workday's lifecycle belongs to `start_workday`/`end_workday`
+/// while it's running, so fixing a forgotten clock-out is the same two-step flow as a
+/// forgotten break — end it (however late), then correct the bounds here. `work_date`
+/// is recomputed from the corrected `started_at` so a session edited across a local
+/// midnight boundary still files under the right calendar day.
+///
+/// The new bounds must still fully contain every break recorded against this
+/// workday — the reverse of `update_break`'s own containment check — since a break
+/// outliving the workday it belongs to would silently corrupt `worked_seconds`.
+pub fn update_workday(
+    conn: &Connection,
+    id: i64,
+    started_at: DateTime<Utc>,
+    ended_at: DateTime<Utc>,
+) -> Result<WorkDay, WorkdayError> {
+    let existing = work_days_repo::get_by_id(conn, id)?.ok_or(WorkdayError::WorkdayNotFound)?;
+    if existing.is_running() {
+        return Err(WorkdayError::CannotEditRunningWorkday);
+    }
+    if ended_at <= started_at {
+        return Err(WorkdayError::InvalidWorkdayBounds);
+    }
+    let breaks = work_days_repo::breaks_for_day(conn, id)?;
+    let contains_all_breaks = breaks
+        .iter()
+        .all(|b| b.started_at >= started_at && b.ended_at.map_or(false, |e| e <= ended_at));
+    if !contains_all_breaks {
+        return Err(WorkdayError::WorkdayMustContainBreaks);
+    }
+    let work_date = local_date(started_at).format("%Y-%m-%d").to_string();
+    Ok(work_days_repo::update_workday(conn, id, &work_date, started_at, ended_at)?)
 }
 
 /// Unlike the timer, there's no "switch" semantic for a workday/break — starting one
@@ -488,6 +531,76 @@ mod tests {
         let conn = open_in_memory().unwrap();
         let result = delete_break(&conn, 999);
         assert!(matches!(result, Err(WorkdayError::BreakNotFound)));
+    }
+
+    #[test]
+    fn update_workday_corrects_a_completed_days_bounds() {
+        let mut conn = open_in_memory().unwrap();
+        let day = start_workday(&conn, now()).unwrap();
+        let editing_at = now() + chrono::Duration::hours(20); // forgot to clock out in time
+        end_workday(&mut conn, editing_at).unwrap();
+
+        let corrected_start = now();
+        let corrected_end = now() + chrono::Duration::hours(8);
+        let updated = update_workday(&conn, day.id, corrected_start, corrected_end).unwrap();
+
+        assert_eq!(updated.started_at, corrected_start);
+        assert_eq!(updated.ended_at, Some(corrected_end));
+    }
+
+    #[test]
+    fn update_workday_rejects_editing_a_still_running_workday() {
+        let conn = open_in_memory().unwrap();
+        let day = start_workday(&conn, now()).unwrap();
+
+        let result = update_workday(&conn, day.id, now(), now() + chrono::Duration::hours(1));
+
+        assert!(matches!(result, Err(WorkdayError::CannotEditRunningWorkday)));
+    }
+
+    #[test]
+    fn update_workday_rejects_end_at_or_before_start() {
+        let mut conn = open_in_memory().unwrap();
+        let day = start_workday(&conn, now()).unwrap();
+        end_workday(&mut conn, now() + chrono::Duration::hours(1)).unwrap();
+
+        let result = update_workday(&conn, day.id, now(), now());
+
+        assert!(matches!(result, Err(WorkdayError::InvalidWorkdayBounds)));
+    }
+
+    #[test]
+    fn update_workday_rejects_bounds_that_exclude_a_recorded_break() {
+        let mut conn = open_in_memory().unwrap();
+        let day = start_workday(&conn, now()).unwrap();
+        start_break(&conn, now() + chrono::Duration::hours(2)).unwrap();
+        end_break(&conn, now() + chrono::Duration::hours(2) + chrono::Duration::minutes(30)).unwrap();
+        end_workday(&mut conn, now() + chrono::Duration::hours(8)).unwrap();
+
+        // Shrinking the end below the break's own end must be rejected.
+        let result = update_workday(&conn, day.id, now(), now() + chrono::Duration::hours(1));
+
+        assert!(matches!(result, Err(WorkdayError::WorkdayMustContainBreaks)));
+    }
+
+    #[test]
+    fn update_workday_rejects_an_unknown_id() {
+        let conn = open_in_memory().unwrap();
+        let result = update_workday(&conn, 999, now(), now() + chrono::Duration::hours(1));
+        assert!(matches!(result, Err(WorkdayError::WorkdayNotFound)));
+    }
+
+    #[test]
+    fn update_workday_recomputes_work_date_from_the_corrected_start() {
+        let mut conn = open_in_memory().unwrap();
+        let day = start_workday(&conn, now()).unwrap();
+        end_workday(&mut conn, now() + chrono::Duration::hours(1)).unwrap();
+
+        let new_start = now() + chrono::Duration::days(1);
+        let new_end = new_start + chrono::Duration::hours(1);
+        let updated = update_workday(&conn, day.id, new_start, new_end).unwrap();
+
+        assert_eq!(updated.work_date, local_date(new_start).format("%Y-%m-%d").to_string());
     }
 
     #[test]

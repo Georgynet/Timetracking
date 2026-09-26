@@ -302,6 +302,27 @@ label {
   font-size: 0.9em;
 }
 
+.workday-sessions {
+  color: var(--muted);
+  font-size: 0.9em;
+}
+
+.workday-sessions p {
+  margin: 0.25em 0 0;
+}
+
+/* Prev/date-label/Next row for navigating which day's completed sessions are listed
+   (see ADR-0032) — the date label sits between the two nav buttons. */
+.workday-sessions-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+}
+
+.workday-sessions-empty {
+  font-style: italic;
+}
+
 /* Settings modal: a small heading over a group of related fields. */
 .settings-group {
   margin: 0.75em 0 0.25em;

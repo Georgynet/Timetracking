@@ -1,10 +1,17 @@
 import { useEffect, useState } from "react";
-import type { DailySummary, RangeSummary, WorkBreak, WorkdayStatus } from "../api/types";
-import { formatDuration, formatElapsed } from "../lib/format";
+import type { DailySummary, RangeSummary, WorkBreak, WorkdaySession, WorkdayStatus } from "../api/types";
+import { formatDuration, formatElapsed, localDateString, shiftDate, toTimeInput } from "../lib/format";
 import { EditBreakForm } from "./EditBreakForm";
+import { EditWorkdayForm } from "./EditWorkdayForm";
 
 interface WorkdayWidgetProps {
   activeWorkday: WorkdayStatus | null;
+  /** Completed sessions for `workdaySessionsDate` (see ADR-0032) — not necessarily today. */
+  workdaySessions: WorkdaySession[];
+  workdaySessionsDate: string;
+  /** Preference gate for the two rows this renders — off by default, since they cost
+   *  permanent vertical space for a need that's rare (see ADR-0032's Settings toggle). */
+  workdayEditingEnabled: boolean;
   dailySummary: DailySummary | null;
   weekSummary: RangeSummary | null;
   monthSummary: RangeSummary | null;
@@ -13,6 +20,8 @@ interface WorkdayWidgetProps {
   onStartBreak: () => Promise<void>;
   onEndBreak: () => Promise<void>;
   onBreakUpdated: () => Promise<void>;
+  onWorkdayUpdated: () => Promise<void>;
+  onNavigateDate: (date: string) => Promise<void>;
 }
 
 function breakSeconds(brk: WorkBreak, nowMs: number): number {
@@ -34,6 +43,16 @@ function currentSessionBreakSeconds(workday: WorkdayStatus, nowMs: number): numb
   return workday.breaks.reduce((total, brk) => total + breakSeconds(brk, nowMs), 0);
 }
 
+/** A completed session's own worked time — span minus its breaks, same formula as
+ *  `currentSessionWorkedSeconds` but for a session that's already ended. */
+function sessionWorkedSeconds(session: WorkdaySession, nowMs: number): number {
+  const start = new Date(session.startedAt).getTime();
+  const end = session.endedAt ? new Date(session.endedAt).getTime() : nowMs;
+  const span = Math.max(0, (end - start) / 1000);
+  const breaks = session.breaks.reduce((total, brk) => total + breakSeconds(brk, nowMs), 0);
+  return Math.max(0, span - breaks);
+}
+
 function formatDiff(diffSeconds: number): string {
   const sign = diffSeconds > 0 ? "+" : diffSeconds < 0 ? "−" : "";
   return `${sign}${formatDuration(Math.abs(diffSeconds))}`;
@@ -41,6 +60,9 @@ function formatDiff(diffSeconds: number): string {
 
 export function WorkdayWidget({
   activeWorkday,
+  workdaySessions,
+  workdaySessionsDate,
+  workdayEditingEnabled,
   dailySummary,
   weekSummary,
   monthSummary,
@@ -49,11 +71,17 @@ export function WorkdayWidget({
   onStartBreak,
   onEndBreak,
   onBreakUpdated,
+  onWorkdayUpdated,
+  onNavigateDate,
 }: WorkdayWidgetProps) {
   const [now, setNow] = useState(() => Date.now());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editingBreak, setEditingBreak] = useState<WorkBreak | null>(null);
+  const [editingSession, setEditingSession] = useState<WorkdaySession | null>(null);
+
+  const today = localDateString();
+  const endedSessions = workdaySessions.filter((s) => s.endedAt);
 
   useEffect(() => {
     if (!activeWorkday) return;
@@ -152,6 +180,50 @@ export function WorkdayWidget({
       )}
       {editingBreak && (
         <EditBreakForm brk={editingBreak} onClose={() => setEditingBreak(null)} onSaved={onBreakUpdated} />
+      )}
+      {workdayEditingEnabled && (
+        <div className="workday-sessions">
+          <p className="workday-sessions-nav">
+            <button
+              type="button"
+              className="link-button"
+              onClick={() => onNavigateDate(shiftDate(workdaySessionsDate, -1))}
+            >
+              ‹ Prev day
+            </button>
+            <span>{workdaySessionsDate === today ? "Today's sessions" : workdaySessionsDate}</span>
+            <button
+              type="button"
+              className="link-button"
+              disabled={workdaySessionsDate >= today}
+              onClick={() => onNavigateDate(shiftDate(workdaySessionsDate, 1))}
+            >
+              Next day ›
+            </button>
+          </p>
+          {endedSessions.length === 0 ? (
+            <p className="workday-sessions-empty">No completed sessions</p>
+          ) : (
+            <p>
+              {endedSessions.map((s, i) => (
+                <span key={s.id}>
+                  {i > 0 && ", "}
+                  <button type="button" className="link-button" onClick={() => setEditingSession(s)}>
+                    {toTimeInput(s.startedAt)}–{toTimeInput(s.endedAt!)} (
+                    {formatDuration(Math.round(sessionWorkedSeconds(s, now)))})
+                  </button>
+                </span>
+              ))}
+            </p>
+          )}
+        </div>
+      )}
+      {editingSession && (
+        <EditWorkdayForm
+          session={editingSession}
+          onClose={() => setEditingSession(null)}
+          onSaved={onWorkdayUpdated}
+        />
       )}
       {(activeWorkday || dailySummary) && (
         <p className="workday-summary">

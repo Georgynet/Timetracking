@@ -17,6 +17,7 @@ import type {
   TimeEntry,
   WorkBreak,
   WorkDay,
+  WorkdaySession,
   WorkdayStatus,
 } from "./types";
 
@@ -30,6 +31,7 @@ export const savePreferences = (params: {
   currentSprintDefault: boolean;
   ticketOrder: TicketOrder;
   theme: ThemePreference;
+  workdayEditingEnabled: boolean;
 }) =>
   invoke<Preferences>("save_preferences", {
     myTasksRows: params.myTasksRows,
@@ -37,6 +39,7 @@ export const savePreferences = (params: {
     currentSprintDefault: params.currentSprintDefault,
     ticketOrder: params.ticketOrder,
     theme: params.theme,
+    workdayEditingEnabled: params.workdayEditingEnabled,
   });
 
 export const saveJiraSettings = (baseUrl: string, email: string, apiToken: string) =>
@@ -137,6 +140,17 @@ export const updateBreak = (params: { id: number; startedAt: string; endedAt: st
   });
 
 export const deleteBreak = (id: number) => invoke<void>("delete_break", { id });
+
+export const updateWorkday = (params: { id: number; startedAt: string; endedAt: string }) =>
+  invoke<WorkDay>("update_workday", {
+    id: params.id,
+    startedAt: params.startedAt,
+    endedAt: params.endedAt,
+  });
+
+/** `date` (`YYYY-MM-DD`) defaults to today when omitted. */
+export const getWorkdaySessions = (date?: string) =>
+  invoke<WorkdaySession[]>("get_workday_sessions", { date: date ?? null });
 
 export const getDailySummary = (date?: string) =>
   invoke<DailySummary>("get_daily_summary", { date: date ?? null });

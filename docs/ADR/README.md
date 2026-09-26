@@ -40,3 +40,6 @@ it instead, so the history of *why* stays intact.
 | [0028](0028-logout-lives-in-settings.md) | Disconnecting from Jira lives in Settings and is called "Log out" | Accepted |
 | [0029](0029-three-way-theme-preference.md) | A three-way theme preference, resolved in JS to a `data-theme` attribute | Accepted |
 | [0030](0030-deletable-completed-breaks.md) | Allow deleting a completed break | Accepted |
+| [0031](0031-editable-completed-workday-sessions.md) | Allow editing a completed workday session's start/end time | Accepted |
+| [0032](0032-workday-sessions-date-navigation.md) | Date navigation for past workday sessions | Accepted |
+| [0033](0033-workday-editing-preference-gate.md) | Gate the workday sessions nav behind an off-by-default preference | Accepted |

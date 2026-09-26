@@ -51,6 +51,20 @@ pub fn stop_running(conn: &Connection, id: i64, ended_at: DateTime<Utc>) -> rusq
     Ok(get_by_id(conn, id)?.expect("row was just updated"))
 }
 
+pub fn update_workday(
+    conn: &Connection,
+    id: i64,
+    work_date: &str,
+    started_at: DateTime<Utc>,
+    ended_at: DateTime<Utc>,
+) -> rusqlite::Result<WorkDay> {
+    conn.execute(
+        "UPDATE work_days SET work_date = ?1, started_at = ?2, ended_at = ?3 WHERE id = ?4",
+        params![work_date, started_at, ended_at, id],
+    )?;
+    Ok(get_by_id(conn, id)?.expect("row was just updated"))
+}
+
 /// All workday rows for a given local calendar date (`YYYY-MM-DD`), oldest first —
 /// there can be more than one for split shifts.
 pub fn work_days_for_date(conn: &Connection, date: &str) -> rusqlite::Result<Vec<WorkDay>> {
