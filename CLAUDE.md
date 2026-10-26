@@ -123,6 +123,9 @@ The tray menu (`tray.rs`, ADR-0036) is a status + quick-actions menu rebuilt fro
 command that changes what the menu shows (timer, workday/break, favorites) must call
 `tray::refresh(&app)` *after* releasing the DB lock (it reads the DB itself); tray actions go
 through the same engines as the commands and emit `tray-state-changed` so the frontend refetches.
+On macOS only (ADR-0037) the tray also shows a title next to the icon, swaps between three
+template icons by state, opens the window on left click, and closing the window hides it
+instead of quitting; Linux deliberately keeps just the menu and quit-on-close.
 
 ### Testing conventions (Rust)
 

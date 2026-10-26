@@ -72,6 +72,18 @@ pub fn run() {
 
             Ok(())
         })
+        // On macOS, closing the window keeps the app running in the menu bar (the usual
+        // behavior for a menu bar utility, ADR-0037); "Quit" in the tray or app menu
+        // exits. Without a tray there'd be no way back to a hidden window, and on Linux
+        // the tray is only best-effort, so there closing still quits.
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if cfg!(target_os = "macos") && window.state::<AppState>().is_tray_available() {
+                    api.prevent_close();
+                    let _ = window.hide();
+                }
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             commands::is_tray_available,
             commands::preferences::get_preferences,
@@ -111,8 +123,15 @@ pub fn run() {
             commands::stats::get_ticket_stats,
             commands::stats::get_interval_stats,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|_app, _event| {
+            // Clicking the Dock icon while the window is hidden brings it back.
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Reopen { has_visible_windows: false, .. } = _event {
+                tray::show_main_window(_app);
+            }
+        });
 }
 
 /// Rebuilds the in-memory Jira client from saved settings + the keychain token, if

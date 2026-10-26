@@ -16,7 +16,7 @@ use std::time::Duration;
 use chrono::{DateTime, Local, NaiveDate, Utc};
 use rusqlite::Connection;
 use tauri::menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem, Submenu};
-use tauri::tray::TrayIconBuilder;
+use tauri::tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
 use tauri::{App, AppHandle, Emitter, Manager, Wry};
 
 use crate::commands::sync::sync_all_impl;
@@ -291,44 +291,115 @@ struct TextHandles {
 pub fn build(app: &App) -> tauri::Result<()> {
     let handle = app.handle();
     let tray_state = TrayState::default();
-    let (menu, handles) = build_menu(handle, &tray_state)?;
+    let (model, jira_configured) = load_model(handle);
+    let (menu, handles) = build_menu(handle, &model, jira_configured, false)?;
+    // On macOS a left click opens the window and the menu is on right click (ADR-0037);
+    // Linux (AppIndicator) has no click events and always shows the menu.
     TrayIconBuilder::with_id(TRAY_ID)
-        .icon(tray_icon(app)?)
+        .icon(tray_icon(app, IconState::of(&model))?)
         .icon_as_template(cfg!(target_os = "macos"))
         .tooltip("Time Tracker")
         .menu(&menu)
+        .show_menu_on_left_click(!cfg!(target_os = "macos"))
         .on_menu_event(on_menu_event)
+        .on_tray_icon_event(on_tray_icon_event)
         .build(app)?;
     *tray_state.handles.lock().unwrap() = Some(handles);
     app.manage(tray_state);
+    update_title(handle, &model, Utc::now());
     spawn_ticker(handle.clone());
     Ok(())
 }
 
-/// The macOS menu bar expects a monochrome "template" image that the OS recolors for light
-/// and dark menu bars; a full-color icon looks out of place there. Linux panels have no
-/// such convention (and a black template would vanish on a dark panel), so they get the
-/// regular app icon.
+/// Which macOS menu bar icon to show; the running timer wins over a break, since a
+/// timer left running during a break is exactly what the user should notice.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum IconState {
+    Idle,
+    Running,
+    OnBreak,
+}
+
+impl IconState {
+    pub fn of(model: &TrayModel) -> Self {
+        match (&model.running, &model.workday) {
+            (Some(_), _) => Self::Running,
+            (None, WorkdayStatus::OnBreak { .. }) => Self::OnBreak,
+            _ => Self::Idle,
+        }
+    }
+}
+
+/// The macOS menu bar expects monochrome "template" images that the OS recolors for
+/// light and dark menu bars; a full-color icon looks out of place there. Linux panels
+/// have no such convention (and a black template would vanish on a dark panel), so they
+/// get the regular app icon regardless of state.
 #[cfg(target_os = "macos")]
-fn tray_icon(_app: &App) -> tauri::Result<tauri::image::Image<'static>> {
-    Ok(tauri::include_image!("icons/tray-template.png"))
+fn tray_icon<M: Manager<Wry>>(_app: &M, state: IconState) -> tauri::Result<tauri::image::Image<'static>> {
+    Ok(match state {
+        IconState::Idle => tauri::include_image!("icons/tray-idle.png"),
+        IconState::Running => tauri::include_image!("icons/tray-running.png"),
+        IconState::OnBreak => tauri::include_image!("icons/tray-break.png"),
+    })
 }
 
 #[cfg(not(target_os = "macos"))]
-fn tray_icon(app: &App) -> tauri::Result<tauri::image::Image<'static>> {
-    app.default_window_icon()
+fn tray_icon<M: Manager<Wry>>(app: &M, _state: IconState) -> tauri::Result<tauri::image::Image<'static>> {
+    app.app_handle()
+        .default_window_icon()
         .cloned()
         .map(|icon| icon.to_owned())
         .ok_or_else(|| tauri::Error::AssetNotFound("default window icon".into()))
 }
 
-/// Rebuilds the whole menu from current state. A no-op when the tray isn't available.
-/// Callers must not hold the DB lock (this reads from the database).
+/// The text next to the macOS menu bar icon: the running ticket and its elapsed time,
+/// or the break's elapsed time; nothing while idle, so the icon alone stays compact.
+pub fn menu_bar_title(model: &TrayModel, now: DateTime<Utc>) -> Option<String> {
+    match (&model.running, &model.workday) {
+        (Some(r), _) => Some(format!("{} {}", r.task.key, format_hm((now - r.started_at).num_seconds()))),
+        (None, WorkdayStatus::OnBreak { since, .. }) => {
+            Some(format!("Break {}", format_hm((now - *since).num_seconds())))
+        }
+        _ => None,
+    }
+}
+
+/// macOS only: Linux AppIndicator labels are inconsistently supported across desktop
+/// environments, so Linux keeps the plain icon (ADR-0037).
+fn update_title(app: &AppHandle, model: &TrayModel, now: DateTime<Utc>) {
+    if !cfg!(target_os = "macos") {
+        return;
+    }
+    let Some(tray) = app.tray_by_id(TRAY_ID) else { return };
+    if let Err(err) = tray.set_title(menu_bar_title(model, now)) {
+        tracing::warn!("failed to update tray title: {err}");
+    }
+}
+
+/// `set_icon` drops the template flag on macOS, so it's re-applied every time.
+fn update_icon(app: &AppHandle, model: &TrayModel) {
+    if !cfg!(target_os = "macos") {
+        return;
+    }
+    let Some(tray) = app.tray_by_id(TRAY_ID) else { return };
+    let result = tray_icon(app, IconState::of(model))
+        .and_then(|icon| tray.set_icon(Some(icon)))
+        .and_then(|()| tray.set_icon_as_template(true));
+    if let Err(err) = result {
+        tracing::warn!("failed to update tray icon: {err}");
+    }
+}
+
+/// Rebuilds the whole menu from current state, and the macOS icon/title with it. A
+/// no-op when the tray isn't available. Callers must not hold the DB lock (this reads
+/// from the database).
 pub fn refresh(app: &AppHandle) {
     let (Some(tray_state), Some(tray)) = (app.try_state::<TrayState>(), app.tray_by_id(TRAY_ID)) else {
         return;
     };
-    match build_menu(app, &tray_state) {
+    let (model, jira_configured) = load_model(app);
+    let syncing = tray_state.syncing.load(Ordering::SeqCst);
+    match build_menu(app, &model, jira_configured, syncing) {
         Ok((menu, handles)) => {
             if let Err(err) = tray.set_menu(Some(menu)) {
                 tracing::warn!("failed to replace tray menu: {err}");
@@ -337,10 +408,12 @@ pub fn refresh(app: &AppHandle) {
         }
         Err(err) => tracing::warn!("failed to rebuild tray menu: {err}"),
     }
+    update_icon(app, &model);
+    update_title(app, &model, Utc::now());
 }
 
-/// Updates only the status and sync texts, leaving the menu structure alone.
-/// Callers must not hold the DB lock (this reads from the database).
+/// Updates only the status and sync texts (and the macOS title), leaving the menu
+/// structure alone. Callers must not hold the DB lock (this reads from the database).
 pub fn update_texts(app: &AppHandle) {
     let Some(tray_state) = app.try_state::<TrayState>() else { return };
     // Cloned out so the lock isn't held while the menu calls dispatch to the main
@@ -358,6 +431,7 @@ pub fn update_texts(app: &AppHandle) {
     for err in results.into_iter().filter_map(Result::err) {
         tracing::warn!("failed to update tray menu text: {err}");
     }
+    update_title(app, &model, now);
 }
 
 fn spawn_ticker(app: AppHandle) {
@@ -387,10 +461,13 @@ fn sync_enabled(model: &TrayModel, jira_configured: bool, syncing: bool) -> bool
     jira_configured && model.unsynced > 0 && !syncing
 }
 
-fn build_menu(app: &AppHandle, tray_state: &TrayState) -> tauri::Result<(Menu<Wry>, TextHandles)> {
-    let (model, jira_configured) = load_model(app);
+fn build_menu(
+    app: &AppHandle,
+    model: &TrayModel,
+    jira_configured: bool,
+    syncing: bool,
+) -> tauri::Result<(Menu<Wry>, TextHandles)> {
     let now = Utc::now();
-    let syncing = tray_state.syncing.load(Ordering::SeqCst);
 
     let item = |action: TrayAction, label: &str| {
         MenuItem::with_id(app, action.id(), escape(label), true, None::<&str>)
@@ -513,7 +590,18 @@ fn apply(app: &AppHandle, action: TrayAction) -> AppResult<()> {
     Ok(())
 }
 
-fn show_main_window(app: &AppHandle) {
+fn on_tray_icon_event(tray: &TrayIcon, event: TrayIconEvent) {
+    if let TrayIconEvent::Click {
+        button: MouseButton::Left,
+        button_state: MouseButtonState::Up,
+        ..
+    } = event
+    {
+        show_main_window(tray.app_handle());
+    }
+}
+
+pub fn show_main_window(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.unminimize();
         let _ = window.show();
@@ -682,5 +770,37 @@ mod tests {
         assert_eq!(sync_label(3, false), "Sync to Jira (3 pending)");
         assert_eq!(sync_label(0, false), "Sync to Jira (all synced)");
         assert_eq!(sync_label(3, true), "Syncing…");
+    }
+
+    #[test]
+    fn menu_bar_title_and_icon_follow_timer_then_break() {
+        let idle = TrayModel::default();
+        assert_eq!(menu_bar_title(&idle, now()), None);
+        assert_eq!(IconState::of(&idle), IconState::Idle);
+
+        let on_break = TrayModel {
+            workday: WorkdayStatus::OnBreak {
+                since: now() - chrono::Duration::minutes(12),
+                worked_seconds: 0,
+            },
+            ..TrayModel::default()
+        };
+        assert_eq!(menu_bar_title(&on_break, now()).as_deref(), Some("Break 0:12"));
+        assert_eq!(IconState::of(&on_break), IconState::OnBreak);
+
+        // A timer left running during a break is what the user should see.
+        let running_on_break = TrayModel {
+            running: Some(RunningTimer {
+                task: TaskRef {
+                    id: 1,
+                    key: "PROJ-1".into(),
+                    summary: "Fix login".into(),
+                },
+                started_at: now() - chrono::Duration::minutes(83),
+            }),
+            ..on_break
+        };
+        assert_eq!(menu_bar_title(&running_on_break, now()).as_deref(), Some("PROJ-1 1:23"));
+        assert_eq!(IconState::of(&running_on_break), IconState::Running);
     }
 }
