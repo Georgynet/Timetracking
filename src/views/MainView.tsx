@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { isTrayAvailable } from "../api/commands";
+import { onTrayStateChanged, onTraySyncFinished } from "../api/events";
 import type { SyncReport } from "../api/types";
 import { orderTasks } from "../lib/tasks";
 import { useStore } from "../state/store";
@@ -58,6 +59,28 @@ export function MainView({ onLoggedOut }: { onLoggedOut: () => void }) {
     loadWorkdaySessions();
     loadPeriodSummaries();
     isTrayAvailable().then(setTrayAvailable);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // The tray acts on the backend directly, so re-read whatever it may have changed —
+  // the same authoritative refetch the store does after its own actions.
+  useEffect(() => {
+    const unlisteners = [
+      onTrayStateChanged(() => {
+        loadActiveTimer();
+        loadUnsyncedCount();
+        loadActiveWorkday();
+        loadWorkdaySessions();
+        loadPeriodSummaries();
+        setHistoryRefreshSignal((n) => n + 1);
+      }),
+      onTraySyncFinished((report) => {
+        loadUnsyncedCount();
+        setSyncReport(report);
+        setHistoryRefreshSignal((n) => n + 1);
+      }),
+    ];
+    return () => unlisteners.forEach((unlisten) => unlisten.then((fn) => fn()));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

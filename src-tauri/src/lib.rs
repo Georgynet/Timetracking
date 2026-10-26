@@ -10,13 +10,12 @@ mod state;
 mod stats;
 mod sync;
 mod timer;
+mod tray;
 mod workday;
 
 use std::sync::Arc;
 
-use tauri::menu::{Menu, MenuItem};
-use tauri::tray::TrayIconBuilder;
-use tauri::{App, Manager};
+use tauri::Manager;
 
 use state::AppState;
 
@@ -49,14 +48,16 @@ pub fn run() {
             restore_jira_client(&state);
             app.manage(state);
 
-            // Built programmatically (not declared in tauri.conf.json) so failure can
-            // be caught here and the app falls back to a window-only mode instead of
-            // crashing — some Linux desktop environments (stock GNOME without an
-            // AppIndicator extension) have no tray support at all.
-            let tray_available = build_tray(app).is_ok();
-            if !tray_available {
-                tracing::warn!("system tray unavailable; falling back to window-only mode");
-            }
+            // Some Linux desktop environments (stock GNOME without an AppIndicator
+            // extension) have no tray support at all — fall back to window-only mode
+            // instead of crashing.
+            let tray_available = match tray::build(app) {
+                Ok(()) => true,
+                Err(err) => {
+                    tracing::warn!("system tray unavailable ({err}); falling back to window-only mode");
+                    false
+                }
+            };
             app.state::<AppState>().set_tray_available(tray_available);
 
             // Debug builds use a separate db/keychain (see above) but look identical
@@ -129,37 +130,4 @@ fn restore_jira_client(state: &AppState) {
             base_url, email, token,
         )));
     }
-}
-
-fn build_tray(app: &App) -> tauri::Result<()> {
-    let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&quit])?;
-    TrayIconBuilder::new()
-        .icon(tray_icon(app)?)
-        .icon_as_template(cfg!(target_os = "macos"))
-        .menu(&menu)
-        .on_menu_event(|app, event| {
-            if event.id() == "quit" {
-                app.exit(0);
-            }
-        })
-        .build(app)?;
-    Ok(())
-}
-
-/// The macOS menu bar expects a monochrome "template" image that the OS recolors for light
-/// and dark menu bars; a full-color icon looks out of place there. Linux panels have no
-/// such convention (and a black template would vanish on a dark panel), so they get the
-/// regular app icon.
-#[cfg(target_os = "macos")]
-fn tray_icon(_app: &App) -> tauri::Result<tauri::image::Image<'static>> {
-    Ok(tauri::include_image!("icons/tray-template.png"))
-}
-
-#[cfg(not(target_os = "macos"))]
-fn tray_icon(app: &App) -> tauri::Result<tauri::image::Image<'static>> {
-    app.default_window_icon()
-        .cloned()
-        .map(|icon| icon.to_owned())
-        .ok_or_else(|| tauri::Error::AssetNotFound("default window icon".into()))
 }

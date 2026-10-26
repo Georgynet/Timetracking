@@ -1,12 +1,13 @@
 use serde::Serialize;
-use tauri::State;
+use tauri::{AppHandle, State};
 
 use crate::db::time_entries_repo;
 use crate::error::AppResult;
 use crate::state::AppState;
 use crate::sync::service;
+use crate::tray;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SyncFailure {
     pub entry_id: i64,
@@ -14,7 +15,7 @@ pub struct SyncFailure {
     pub message: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SyncReportDto {
     pub total: usize,
@@ -22,8 +23,8 @@ pub struct SyncReportDto {
     pub failed: Vec<SyncFailure>,
 }
 
-#[tauri::command]
-pub async fn sync_all(state: State<'_, AppState>) -> AppResult<SyncReportDto> {
+/// Shared by the `sync_all` command and the tray's "Sync to Jira" item.
+pub async fn sync_all_impl(state: &AppState) -> AppResult<SyncReportDto> {
     let client = state.require_jira_client()?;
     let outcomes = service::sync_all(&state.db, &*client).await;
 
@@ -43,6 +44,13 @@ pub async fn sync_all(state: State<'_, AppState>) -> AppResult<SyncReportDto> {
         }
     }
     Ok(report)
+}
+
+#[tauri::command]
+pub async fn sync_all(app: AppHandle, state: State<'_, AppState>) -> AppResult<SyncReportDto> {
+    let report = sync_all_impl(&state).await;
+    tray::update_texts(&app);
+    report
 }
 
 #[tauri::command]

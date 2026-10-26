@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use chrono::Utc;
-use tauri::State;
+use tauri::{AppHandle, State};
 
 use crate::db::models::Task;
 use crate::db::tasks_repo;
@@ -9,6 +9,7 @@ use crate::error::AppResult;
 use crate::jira::models::JiraIssue;
 use crate::jira::JiraClient;
 use crate::state::AppState;
+use crate::tray;
 
 /// Matches a Jira issue key like `PROJ-123`: an all-caps (letters+digits) project
 /// prefix starting with a letter, a dash, then digits. Written by hand instead of
@@ -99,13 +100,21 @@ pub async fn search_jira_issues(state: State<'_, AppState>, query: String) -> Ap
 }
 
 #[tauri::command]
-pub async fn add_favorite_by_key(state: State<'_, AppState>, jira_key: String) -> AppResult<Task> {
+pub async fn add_favorite_by_key(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    jira_key: String,
+) -> AppResult<Task> {
     let client = state.require_jira_client()?;
     let jira_key = jira_key.trim().to_uppercase();
     let issue = client.get_issue(&jira_key).await?;
 
-    let conn = state.db.lock().unwrap();
-    Ok(tasks_repo::upsert_favorite_task(&conn, &issue.key, &issue.summary, Utc::now())?)
+    let task = {
+        let conn = state.db.lock().unwrap();
+        tasks_repo::upsert_favorite_task(&conn, &issue.key, &issue.summary, Utc::now())
+    };
+    tray::refresh(&app);
+    Ok(task?)
 }
 
 /// Resolves a ticket found via `search_jira_issues` into a `tasks` row without adding
@@ -122,10 +131,13 @@ pub async fn resolve_task_by_key(state: State<'_, AppState>, jira_key: String) -
 }
 
 #[tauri::command]
-pub fn remove_favorite(state: State<'_, AppState>, task_id: i64) -> AppResult<()> {
-    let conn = state.db.lock().unwrap();
-    tasks_repo::remove_favorite(&conn, task_id)?;
-    Ok(())
+pub fn remove_favorite(app: AppHandle, state: State<'_, AppState>, task_id: i64) -> AppResult<()> {
+    let result = {
+        let conn = state.db.lock().unwrap();
+        tasks_repo::remove_favorite(&conn, task_id)
+    };
+    tray::refresh(&app);
+    Ok(result?)
 }
 
 #[cfg(test)]
