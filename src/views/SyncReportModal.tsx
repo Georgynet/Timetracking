@@ -1,9 +1,12 @@
 import type { SyncReport } from "../api/types";
+import { useBackdropClose } from "../lib/modal";
 
 export function SyncReportModal({ report, onClose }: { report: SyncReport; onClose: () => void }) {
+  const backdrop = useBackdropClose(onClose);
+
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+    <div className="modal-backdrop" {...backdrop}>
+      <div className="modal">
         <h2>Sync results</h2>
         <p>
           {report.succeeded.length} of {report.total} entries synced successfully.

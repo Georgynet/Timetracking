@@ -2,6 +2,7 @@ import { FormEvent, useState } from "react";
 import { updateWorkday } from "../api/commands";
 import type { WorkdaySession } from "../api/types";
 import { combine, toDateInput, toTimeInput } from "../lib/format";
+import { useBackdropClose } from "../lib/modal";
 
 interface EditWorkdayFormProps {
   session: WorkdaySession;
@@ -44,9 +45,11 @@ export function EditWorkdayForm({ session, onClose, onSaved }: EditWorkdayFormPr
     }
   }
 
+  const backdrop = useBackdropClose(onClose);
+
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <form className="modal" onClick={(e) => e.stopPropagation()} onSubmit={handleSubmit}>
+    <div className="modal-backdrop" {...backdrop}>
+      <form className="modal" onSubmit={handleSubmit}>
         <h2>Edit workday</h2>
         <label>
           Start date

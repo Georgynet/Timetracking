@@ -2,6 +2,7 @@ import { FormEvent, useState } from "react";
 import { createManualEntry, resolveTaskByKey, searchJiraIssues, updateTimeEntry } from "../api/commands";
 import type { JiraIssue, Task, TimeEntry } from "../api/types";
 import { combine, formatDurationInput, parseDurationInput, toDateInput, toTimeInput } from "../lib/format";
+import { useBackdropClose } from "../lib/modal";
 
 interface ManualEntryFormProps {
   tasks: Task[];
@@ -126,9 +127,11 @@ export function ManualEntryForm({ tasks, entry, onClose, onSaved }: ManualEntryF
     }
   }
 
+  const backdrop = useBackdropClose(onClose);
+
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <form className="modal" onClick={(e) => e.stopPropagation()} onSubmit={handleSubmit}>
+    <div className="modal-backdrop" {...backdrop}>
+      <form className="modal" onSubmit={handleSubmit}>
         <h2>{entry ? "Edit time entry" : "New manual entry"}</h2>
         <label>
           Ticket
