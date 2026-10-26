@@ -3,6 +3,7 @@ import { FormEvent, useState } from "react";
 import { deleteBreak, updateBreak } from "../api/commands";
 import type { WorkBreak } from "../api/types";
 import { combine, toDateInput, toTimeInput } from "../lib/format";
+import { useBackdropClose } from "../lib/modal";
 
 interface EditBreakFormProps {
   brk: WorkBreak;
@@ -59,9 +60,11 @@ export function EditBreakForm({ brk, onClose, onSaved }: EditBreakFormProps) {
     }
   }
 
+  const backdrop = useBackdropClose(onClose);
+
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <form className="modal" onClick={(e) => e.stopPropagation()} onSubmit={handleSubmit}>
+    <div className="modal-backdrop" {...backdrop}>
+      <form className="modal" onSubmit={handleSubmit}>
         <h2>Edit break</h2>
         <label>
           Start date

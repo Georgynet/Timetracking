@@ -2,6 +2,7 @@ import { confirm } from "@tauri-apps/plugin-dialog";
 import { FormEvent, useState } from "react";
 import { clearJiraSettings } from "../api/commands";
 import type { Preferences, ThemePreference, TicketOrder } from "../api/types";
+import { useBackdropClose } from "../lib/modal";
 
 interface SettingsModalProps {
   preferences: Preferences;
@@ -86,9 +87,11 @@ export function SettingsModal({
   // with no place left to report a failure, and a failed logout is not a no-op.
   const busy = saving || loggingOut;
 
+  const backdrop = useBackdropClose(busy ? undefined : onClose);
+
   return (
-    <div className="modal-backdrop" onClick={busy ? undefined : onClose}>
-      <form className="modal" onClick={(e) => e.stopPropagation()} onSubmit={handleSubmit}>
+    <div className="modal-backdrop" {...backdrop}>
+      <form className="modal" onSubmit={handleSubmit}>
         <h2>Settings</h2>
         <h3 className="settings-group">Task panels</h3>
         <label>
