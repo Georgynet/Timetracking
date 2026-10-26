@@ -44,3 +44,4 @@ it instead, so the history of *why* stays intact.
 | [0032](0032-workday-sessions-date-navigation.md) | Date navigation for past workday sessions | Accepted |
 | [0033](0033-workday-editing-preference-gate.md) | Gate the workday sessions nav behind an off-by-default preference | Accepted |
 | [0034](0034-modal-backdrop-press-and-release.md) | Close a modal on backdrop click only when press and release both land on it | Accepted |
+| [0035](0035-app-and-tray-icons.md) | Own app icon, and a monochrome template icon for the macOS tray | Accepted |
