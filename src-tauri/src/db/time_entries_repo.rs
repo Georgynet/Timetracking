@@ -43,6 +43,12 @@ pub fn get_running(conn: &Connection) -> rusqlite::Result<Option<TimeEntry>> {
     .optional()
 }
 
+/// When the most recently finished entry ended — for "how long has no timer been
+/// running" reminders.
+pub fn latest_ended_at(conn: &Connection) -> rusqlite::Result<Option<DateTime<Utc>>> {
+    conn.query_row("SELECT MAX(ended_at) FROM time_entries", [], |row| row.get(0))
+}
+
 pub fn insert_running(
     conn: &Connection,
     task_id: i64,

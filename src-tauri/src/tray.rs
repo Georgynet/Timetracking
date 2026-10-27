@@ -24,7 +24,7 @@ use crate::db::models::Task;
 use crate::db::{tasks_repo, time_entries_repo, work_days_repo};
 use crate::error::AppResult;
 use crate::state::AppState;
-use crate::{timer, workday};
+use crate::{notifications, timer, workday};
 
 const TRAY_ID: &str = "main";
 pub const STATE_CHANGED_EVENT: &str = "tray-state-changed";
@@ -551,8 +551,10 @@ fn on_menu_event(app: &AppHandle, event: MenuEvent) {
         TrayAction::OpenWindow => show_main_window(app),
         TrayAction::Sync => start_sync(app),
         _ => {
-            if let Err(err) = apply(app, action) {
-                tracing::warn!("tray action {action:?} failed: {err}");
+            match apply(app, action) {
+                Ok(()) if action == TrayAction::EndWorkday => notifications::workday_ended(app),
+                Ok(()) => {}
+                Err(err) => tracing::warn!("tray action {action:?} failed: {err}"),
             }
             refresh(app);
             let _ = app.emit(STATE_CHANGED_EVENT, ());
@@ -624,6 +626,7 @@ fn start_sync(app: &AppHandle) {
         app.state::<TrayState>().syncing.store(false, Ordering::SeqCst);
         match result {
             Ok(report) => {
+                notifications::sync_finished(&app, &report);
                 let _ = app.emit(SYNC_FINISHED_EVENT, report);
             }
             Err(err) => tracing::warn!("tray sync failed: {err}"),

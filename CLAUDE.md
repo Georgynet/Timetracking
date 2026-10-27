@@ -126,6 +126,8 @@ through the same engines as the commands and emit `tray-state-changed` so the fr
 On macOS only (ADR-0037) the tray also shows a title next to the icon, swaps between three
 template icons by state, opens the window on left click, and closing the window hides it
 instead of quitting; Linux deliberately keeps just the menu and quit-on-close.
+Notifications (`notifications/`, ADR-0038, macOS only) follow the same split: `reminders::due` is
+pure and tested, a 30-second background thread delivers them, settings are `notify.*` preferences.
 
 ### Testing conventions (Rust)
 

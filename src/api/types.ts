@@ -44,6 +44,26 @@ export interface Preferences {
   workdayEditingEnabled: boolean;
 }
 
+/** Notification preferences (see `notifications::settings`); thresholds in minutes. */
+export interface NotificationSettings {
+  /** Result of a sync started from the tray. */
+  syncResult: boolean;
+  /** Entries still unsynced when the workday is ended. */
+  unsyncedOnEndWorkday: boolean;
+  /** A timer running this long; repeats every time it runs that long again. */
+  longTimer: boolean;
+  longTimerMinutes: number;
+  /** Clocked in, not on a break, and no timer running for this long. */
+  idleWorkday: boolean;
+  idleWorkdayMinutes: number;
+  /** A break running this long. */
+  longBreak: boolean;
+  longBreakMinutes: number;
+  /** The workday still running once today's worked time reaches this. */
+  forgotEndWorkday: boolean;
+  endWorkdayMinutes: number;
+}
+
 export type ThemePreference = "system" | "light" | "dark";
 
 export type TicketOrder = "recent" | "key";
