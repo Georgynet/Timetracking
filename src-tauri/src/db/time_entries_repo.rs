@@ -77,6 +77,22 @@ pub fn stop_running(
     Ok(get_by_id(conn, id)?.expect("row was just updated"))
 }
 
+/// Replaces the comment of the running entry `id` — the note typed while the timer runs,
+/// which becomes the worklog comment once it's stopped and synced. Deliberately not an
+/// `update_entry`: a running entry has never been synced and isn't being "edited" after
+/// the fact, so neither `edited_at` nor `is_synced` is touched.
+pub fn set_running_comment(
+    conn: &Connection,
+    id: i64,
+    comment: Option<&str>,
+) -> rusqlite::Result<TimeEntry> {
+    conn.execute(
+        "UPDATE time_entries SET comment = ?1 WHERE id = ?2 AND ended_at IS NULL",
+        params![comment, id],
+    )?;
+    Ok(get_by_id(conn, id)?.expect("caller must verify entry exists"))
+}
+
 pub fn insert_manual(
     conn: &Connection,
     task_id: i64,
