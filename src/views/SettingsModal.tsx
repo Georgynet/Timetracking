@@ -1,8 +1,34 @@
 import { confirm } from "@tauri-apps/plugin-dialog";
-import { FormEvent, useState } from "react";
-import { clearJiraSettings } from "../api/commands";
-import type { Preferences, ThemePreference, TicketOrder } from "../api/types";
+import { FormEvent, useEffect, useState } from "react";
+import {
+  clearJiraSettings,
+  getNotificationSettings,
+  notificationsSupported,
+  saveNotificationSettings,
+} from "../api/commands";
+import type { NotificationSettings, Preferences, ThemePreference, TicketOrder } from "../api/types";
+import { formatDurationInput, parseDurationInput } from "../lib/format";
 import { useBackdropClose } from "../lib/modal";
+
+/** The reminders that take a threshold, each paired with its on/off flag. */
+const REMINDERS = [
+  { flag: "longTimer", minutes: "longTimerMinutes", label: "Timer running for" },
+  { flag: "idleWorkday", minutes: "idleWorkdayMinutes", label: "Clocked in with no timer for" },
+  { flag: "longBreak", minutes: "longBreakMinutes", label: "Break lasting" },
+  { flag: "forgotEndWorkday", minutes: "endWorkdayMinutes", label: "Workday still running after working" },
+] as const;
+
+type ThresholdKey = (typeof REMINDERS)[number]["minutes"];
+type ThresholdInputs = Record<ThresholdKey, string>;
+
+function thresholdInputs(n: NotificationSettings): ThresholdInputs {
+  return {
+    longTimerMinutes: formatDurationInput(n.longTimerMinutes),
+    idleWorkdayMinutes: formatDurationInput(n.idleWorkdayMinutes),
+    longBreakMinutes: formatDurationInput(n.longBreakMinutes),
+    endWorkdayMinutes: formatDurationInput(n.endWorkdayMinutes),
+  };
+}
 
 interface SettingsModalProps {
   preferences: Preferences;
@@ -38,12 +64,48 @@ export function SettingsModal({
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  // `null` until loaded, and for good where notifications aren't supported (Linux) —
+  // the section is hidden then rather than offering settings that do nothing.
+  const [notifications, setNotifications] = useState<NotificationSettings | null>(null);
+  const [thresholds, setThresholds] = useState<ThresholdInputs | null>(null);
+
+  useEffect(() => {
+    notificationsSupported()
+      .then(async (supported) => {
+        if (!supported) return;
+        const loaded = await getNotificationSettings();
+        setNotifications(loaded);
+        setThresholds(thresholdInputs(loaded));
+      })
+      .catch((err) => setError(String(err)));
+  }, []);
+
+  /** Parses the threshold inputs back into minutes. A disabled reminder keeps its old
+   *  value if its input doesn't parse, so a half-typed value can't block saving. */
+  function resolveNotifications(): NotificationSettings | string {
+    if (!notifications || !thresholds) return "Notification settings are not loaded.";
+    const resolved = { ...notifications };
+    for (const r of REMINDERS) {
+      const parsed = parseDurationInput(thresholds[r.minutes]);
+      if (parsed === null && notifications[r.flag]) {
+        return `"${r.label}": enter a duration like 30m, 1h 30m or 2h`;
+      }
+      resolved[r.minutes] = parsed ?? notifications[r.minutes];
+    }
+    return resolved;
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    const resolvedNotifications = notifications ? resolveNotifications() : null;
+    if (typeof resolvedNotifications === "string") {
+      setError(resolvedNotifications);
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
+      if (resolvedNotifications) await saveNotificationSettings(resolvedNotifications);
       await onSave({
         myTasksRows,
         favoritesRows,
@@ -167,6 +229,53 @@ export function SettingsModal({
           fixing a forgotten clock-out from an earlier day. Off by default since it costs
           two rows of space in the widget and the need for it comes up rarely.
         </p>
+        {notifications && thresholds && (
+          <>
+            <h3 className="settings-group">Notifications</h3>
+            <label className="settings-check">
+              <input
+                type="checkbox"
+                checked={notifications.syncResult}
+                onChange={(e) => setNotifications({ ...notifications, syncResult: e.target.checked })}
+              />
+              Result of a sync started from the tray
+            </label>
+            <label className="settings-check">
+              <input
+                type="checkbox"
+                checked={notifications.unsyncedOnEndWorkday}
+                onChange={(e) =>
+                  setNotifications({ ...notifications, unsyncedOnEndWorkday: e.target.checked })
+                }
+              />
+              Unsynced entries when ending the workday
+            </label>
+            {REMINDERS.map((r) => (
+              <div className="settings-reminder" key={r.flag}>
+                <label className="settings-check">
+                  <input
+                    type="checkbox"
+                    checked={notifications[r.flag]}
+                    onChange={(e) => setNotifications({ ...notifications, [r.flag]: e.target.checked })}
+                  />
+                  {r.label}
+                </label>
+                <input
+                  type="text"
+                  aria-label={`${r.label} (duration)`}
+                  value={thresholds[r.minutes]}
+                  onChange={(e) => setThresholds({ ...thresholds, [r.minutes]: e.target.value })}
+                  disabled={!notifications[r.flag]}
+                />
+              </div>
+            ))}
+            <p className="field-hint">
+              Durations like 30m, 1h 30m or 2h. A long-running timer is reminded about again
+              each time it runs that long once more; the other reminders fire once per
+              occurrence. The workday reminder counts time worked today, breaks excluded.
+            </p>
+          </>
+        )}
         <h3 className="settings-group">Jira connection</h3>
         <div className="settings-account">
           <span className="settings-account-email" title={jiraEmail ?? undefined}>

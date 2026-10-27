@@ -6,6 +6,7 @@ import type {
   IntervalBucket,
   JiraIssue,
   JiraMyself,
+  NotificationSettings,
   Preferences,
   RangeSummary,
   SettingsDto,
@@ -121,6 +122,13 @@ export const syncAll = () => invoke<SyncReport>("sync_all");
 export const listUnsyncedCount = () => invoke<number>("list_unsynced_count");
 
 export const isTrayAvailable = () => invoke<boolean>("is_tray_available");
+
+export const notificationsSupported = () => invoke<boolean>("notifications_supported");
+
+export const getNotificationSettings = () => invoke<NotificationSettings>("get_notification_settings");
+
+export const saveNotificationSettings = (settings: NotificationSettings) =>
+  invoke<NotificationSettings>("save_notification_settings", { settings });
 
 export const getActiveWorkday = () => invoke<WorkdayStatus | null>("get_active_workday");
 

@@ -366,6 +366,24 @@ label {
   width: auto;
 }
 
+/* A reminder toggle with its threshold input on the same line. */
+.settings-reminder {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5em;
+  margin-top: 0.5em;
+}
+
+.settings-reminder .settings-check {
+  margin-top: 0;
+}
+
+.settings-reminder > input {
+  flex: none;
+  width: 6em;
+}
+
 /* A count beside a panel heading: part of the heading, but not shouted like it. */
 .panel-count {
   font-weight: 400;
