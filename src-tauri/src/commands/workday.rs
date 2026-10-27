@@ -1,11 +1,12 @@
 use chrono::{DateTime, NaiveDate, Utc};
 use serde::Serialize;
-use tauri::State;
+use tauri::{AppHandle, State};
 
 use crate::db::models::{WorkBreak, WorkDay};
 use crate::db::work_days_repo;
 use crate::error::{AppError, AppResult};
 use crate::state::AppState;
+use crate::tray;
 use crate::workday::engine::{self, DailySummary, RangeSummary};
 
 fn parse_dt(s: &str) -> AppResult<DateTime<Utc>> {
@@ -59,8 +60,10 @@ fn start_workday_impl(state: &AppState) -> AppResult<WorkDay> {
 }
 
 #[tauri::command]
-pub fn start_workday(state: State<'_, AppState>) -> AppResult<WorkDay> {
-    start_workday_impl(&state)
+pub fn start_workday(app: AppHandle, state: State<'_, AppState>) -> AppResult<WorkDay> {
+    let result = start_workday_impl(&state);
+    tray::refresh(&app);
+    result
 }
 
 fn end_workday_impl(state: &AppState) -> AppResult<WorkDay> {
@@ -69,8 +72,10 @@ fn end_workday_impl(state: &AppState) -> AppResult<WorkDay> {
 }
 
 #[tauri::command]
-pub fn end_workday(state: State<'_, AppState>) -> AppResult<WorkDay> {
-    end_workday_impl(&state)
+pub fn end_workday(app: AppHandle, state: State<'_, AppState>) -> AppResult<WorkDay> {
+    let result = end_workday_impl(&state);
+    tray::refresh(&app);
+    result
 }
 
 fn start_break_impl(state: &AppState) -> AppResult<WorkBreak> {
@@ -79,8 +84,10 @@ fn start_break_impl(state: &AppState) -> AppResult<WorkBreak> {
 }
 
 #[tauri::command]
-pub fn start_break(state: State<'_, AppState>) -> AppResult<WorkBreak> {
-    start_break_impl(&state)
+pub fn start_break(app: AppHandle, state: State<'_, AppState>) -> AppResult<WorkBreak> {
+    let result = start_break_impl(&state);
+    tray::refresh(&app);
+    result
 }
 
 fn end_break_impl(state: &AppState) -> AppResult<WorkBreak> {
@@ -89,8 +96,10 @@ fn end_break_impl(state: &AppState) -> AppResult<WorkBreak> {
 }
 
 #[tauri::command]
-pub fn end_break(state: State<'_, AppState>) -> AppResult<WorkBreak> {
-    end_break_impl(&state)
+pub fn end_break(app: AppHandle, state: State<'_, AppState>) -> AppResult<WorkBreak> {
+    let result = end_break_impl(&state);
+    tray::refresh(&app);
+    result
 }
 
 fn update_break_impl(

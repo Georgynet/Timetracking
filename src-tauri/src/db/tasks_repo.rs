@@ -47,6 +47,18 @@ pub fn list_favorite_tasks(conn: &Connection) -> rusqlite::Result<Vec<Task>> {
     rows.collect()
 }
 
+/// The `limit` most recently tracked tickets (favorite or not), newest first; tickets
+/// never tracked are left out. Wrapped in an outer query because `last_tracked_at` is
+/// a select-list alias, which SQLite doesn't allow in a `WHERE` on the same level.
+pub fn list_recently_tracked(conn: &Connection, limit: usize) -> rusqlite::Result<Vec<Task>> {
+    let mut stmt = conn.prepare(&format!(
+        "SELECT * FROM ({SELECT_TASK}) WHERE last_tracked_at IS NOT NULL \
+         ORDER BY last_tracked_at DESC LIMIT ?1"
+    ))?;
+    let rows = stmt.query_map(params![limit as i64], row_to_task)?;
+    rows.collect()
+}
+
 /// Clears `is_assigned_to_me` (and, since it's only ever meaningful alongside it,
 /// `is_in_current_sprint`) on every task, ahead of re-populating both from a fresh "my
 /// tasks" fetch. Never touches `is_favorite` — a ticket can be both, either, or
@@ -151,6 +163,27 @@ mod tests {
 
         let reloaded = get_task_by_key(&conn, "PROJ-1").unwrap().unwrap();
         assert_eq!(reloaded.last_tracked_at, Some(later), "the newest entry wins");
+    }
+
+    #[test]
+    fn recently_tracked_is_newest_first_and_skips_untracked() {
+        use crate::db::time_entries_repo;
+
+        let conn = open_in_memory().unwrap();
+        let old = upsert_task(&conn, "PROJ-1", "Old", now()).unwrap();
+        let new = upsert_favorite_task(&conn, "PROJ-2", "New", now()).unwrap();
+        upsert_favorite_task(&conn, "PROJ-3", "Never tracked", now()).unwrap();
+        let later = now() + chrono::Duration::hours(1);
+        time_entries_repo::insert_manual(&conn, old.id, now(), now(), 60, None).unwrap();
+        time_entries_repo::insert_manual(&conn, new.id, later, later, 60, None).unwrap();
+
+        let keys: Vec<_> = list_recently_tracked(&conn, 10)
+            .unwrap()
+            .into_iter()
+            .map(|t| t.jira_key)
+            .collect();
+        assert_eq!(keys, ["PROJ-2", "PROJ-1"]);
+        assert_eq!(list_recently_tracked(&conn, 1).unwrap().len(), 1);
     }
 
     #[test]

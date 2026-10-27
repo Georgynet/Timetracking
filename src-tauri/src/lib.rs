@@ -10,13 +10,12 @@ mod state;
 mod stats;
 mod sync;
 mod timer;
+mod tray;
 mod workday;
 
 use std::sync::Arc;
 
-use tauri::menu::{Menu, MenuItem};
-use tauri::tray::TrayIconBuilder;
-use tauri::{App, Manager};
+use tauri::Manager;
 
 use state::AppState;
 
@@ -49,14 +48,16 @@ pub fn run() {
             restore_jira_client(&state);
             app.manage(state);
 
-            // Built programmatically (not declared in tauri.conf.json) so failure can
-            // be caught here and the app falls back to a window-only mode instead of
-            // crashing — some Linux desktop environments (stock GNOME without an
-            // AppIndicator extension) have no tray support at all.
-            let tray_available = build_tray(app).is_ok();
-            if !tray_available {
-                tracing::warn!("system tray unavailable; falling back to window-only mode");
-            }
+            // Some Linux desktop environments (stock GNOME without an AppIndicator
+            // extension) have no tray support at all — fall back to window-only mode
+            // instead of crashing.
+            let tray_available = match tray::build(app) {
+                Ok(()) => true,
+                Err(err) => {
+                    tracing::warn!("system tray unavailable ({err}); falling back to window-only mode");
+                    false
+                }
+            };
             app.state::<AppState>().set_tray_available(tray_available);
 
             // Debug builds use a separate db/keychain (see above) but look identical
@@ -70,6 +71,18 @@ pub fn run() {
             }
 
             Ok(())
+        })
+        // On macOS, closing the window keeps the app running in the menu bar (the usual
+        // behavior for a menu bar utility, ADR-0037); "Quit" in the tray or app menu
+        // exits. Without a tray there'd be no way back to a hidden window, and on Linux
+        // the tray is only best-effort, so there closing still quits.
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if cfg!(target_os = "macos") && window.state::<AppState>().is_tray_available() {
+                    api.prevent_close();
+                    let _ = window.hide();
+                }
+            }
         })
         .invoke_handler(tauri::generate_handler![
             commands::is_tray_available,
@@ -110,8 +123,15 @@ pub fn run() {
             commands::stats::get_ticket_stats,
             commands::stats::get_interval_stats,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|_app, _event| {
+            // Clicking the Dock icon while the window is hidden brings it back.
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Reopen { has_visible_windows: false, .. } = _event {
+                tray::show_main_window(_app);
+            }
+        });
 }
 
 /// Rebuilds the in-memory Jira client from saved settings + the keychain token, if
@@ -129,23 +149,4 @@ fn restore_jira_client(state: &AppState) {
             base_url, email, token,
         )));
     }
-}
-
-fn build_tray(app: &App) -> tauri::Result<()> {
-    let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&quit])?;
-    let icon = app
-        .default_window_icon()
-        .cloned()
-        .ok_or_else(|| tauri::Error::AssetNotFound("default window icon".into()))?;
-    TrayIconBuilder::new()
-        .icon(icon)
-        .menu(&menu)
-        .on_menu_event(|app, event| {
-            if event.id() == "quit" {
-                app.exit(0);
-            }
-        })
-        .build(app)?;
-    Ok(())
 }

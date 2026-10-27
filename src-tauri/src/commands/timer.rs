@@ -1,11 +1,12 @@
 use chrono::Utc;
 use serde::Serialize;
-use tauri::State;
+use tauri::{AppHandle, State};
 
 use crate::db::models::TimeEntry;
 use crate::error::AppResult;
 use crate::state::AppState;
 use crate::timer::engine;
+use crate::tray;
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -30,16 +31,25 @@ pub fn get_active_timer(state: State<'_, AppState>) -> AppResult<Option<ActiveTi
 
 #[tauri::command]
 pub fn start_timer(
+    app: AppHandle,
     state: State<'_, AppState>,
     task_id: i64,
     comment: Option<String>,
 ) -> AppResult<TimeEntry> {
-    let mut conn = state.db.lock().unwrap();
-    Ok(engine::start(&mut conn, task_id, comment, Utc::now())?)
+    let entry = {
+        let mut conn = state.db.lock().unwrap();
+        engine::start(&mut conn, task_id, comment, Utc::now())
+    };
+    tray::refresh(&app);
+    Ok(entry?)
 }
 
 #[tauri::command]
-pub fn stop_timer(state: State<'_, AppState>) -> AppResult<TimeEntry> {
-    let conn = state.db.lock().unwrap();
-    Ok(engine::stop(&conn, Utc::now())?)
+pub fn stop_timer(app: AppHandle, state: State<'_, AppState>) -> AppResult<TimeEntry> {
+    let entry = {
+        let conn = state.db.lock().unwrap();
+        engine::stop(&conn, Utc::now())
+    };
+    tray::refresh(&app);
+    Ok(entry?)
 }

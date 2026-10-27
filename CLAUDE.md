@@ -114,10 +114,18 @@ hand-building ADF elsewhere.
 
 ### Cross-platform tray fallback
 
-The system tray is built programmatically in `lib.rs::build_tray` (not declared in
+The system tray is built programmatically in `tray::build` (not declared in
 `tauri.conf.json`) specifically so a failure (e.g. stock GNOME without an AppIndicator extension)
 can be caught and the app falls back to window-only mode via `AppState::tray_available` /
 `commands::is_tray_available`, instead of crashing. Preserve this fallback if touching tray setup.
+
+The tray menu (`tray.rs`, ADR-0036) is a status + quick-actions menu rebuilt from the DB. A
+command that changes what the menu shows (timer, workday/break, favorites) must call
+`tray::refresh(&app)` *after* releasing the DB lock (it reads the DB itself); tray actions go
+through the same engines as the commands and emit `tray-state-changed` so the frontend refetches.
+On macOS only (ADR-0037) the tray also shows a title next to the icon, swaps between three
+template icons by state, opens the window on left click, and closing the window hides it
+instead of quitting; Linux deliberately keeps just the menu and quit-on-close.
 
 ### Testing conventions (Rust)
 
