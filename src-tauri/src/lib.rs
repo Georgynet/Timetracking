@@ -108,6 +108,7 @@ pub fn run() {
             commands::timer::get_active_timer,
             commands::timer::start_timer,
             commands::timer::stop_timer,
+            commands::timer::update_running_comment,
             commands::entries::create_manual_entry,
             commands::entries::update_time_entry,
             commands::entries::list_time_entries,

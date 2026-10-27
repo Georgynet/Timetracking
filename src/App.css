@@ -237,6 +237,12 @@ label {
   justify-content: space-between;
 }
 
+/* The note takes whatever room the ticket key and elapsed time leave. */
+.timer-note {
+  flex: 1 1 0;
+  min-width: 8em;
+}
+
 .timer-display {
   display: flex;
   align-items: baseline;

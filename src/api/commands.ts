@@ -75,6 +75,10 @@ export const startTimer = (taskId: number, comment?: string) =>
 
 export const stopTimer = () => invoke<TimeEntry>("stop_timer");
 
+/** Saves the note on running entry `id`; rejected once that timer has stopped. */
+export const updateRunningComment = (id: number, comment: string) =>
+  invoke<TimeEntry>("update_running_comment", { id, comment: comment || null });
+
 export const createManualEntry = (params: {
   taskId: number;
   startedAt: string;
