@@ -5,6 +5,7 @@ mod error;
 // exercise `ReqwestJiraClient` directly.
 pub mod jira;
 mod logging;
+mod notifications;
 mod secrets;
 mod state;
 mod stats;
@@ -26,6 +27,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_notification::init())
         .setup(|app| {
             let app_dir = app
                 .path()
@@ -59,6 +61,7 @@ pub fn run() {
                 }
             };
             app.state::<AppState>().set_tray_available(tray_available);
+            notifications::start(app.handle().clone());
 
             // Debug builds use a separate db/keychain (see above) but look identical
             // otherwise — tag the window title so it's obvious at a glance which one
@@ -88,6 +91,9 @@ pub fn run() {
             commands::is_tray_available,
             commands::preferences::get_preferences,
             commands::preferences::save_preferences,
+            commands::notifications::notifications_supported,
+            commands::notifications::get_notification_settings,
+            commands::notifications::save_notification_settings,
             commands::setup::get_settings,
             commands::setup::save_jira_settings,
             commands::setup::test_jira_connection,

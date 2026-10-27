@@ -47,3 +47,4 @@ it instead, so the history of *why* stays intact.
 | [0035](0035-app-and-tray-icons.md) | Own app icon, and a monochrome template icon for the macOS tray | Accepted |
 | [0036](0036-tray-status-and-quick-actions-menu.md) | The tray menu shows status and offers quick actions | Accepted |
 | [0037](0037-macos-menu-bar-extras.md) | macOS menu bar extras — title, state icons, left click, close-to-tray | Accepted |
+| [0038](0038-macos-notifications-and-reminders.md) | macOS notifications — action results and configurable reminders | Accepted |

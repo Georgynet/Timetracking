@@ -6,7 +6,7 @@ use crate::db::models::{WorkBreak, WorkDay};
 use crate::db::work_days_repo;
 use crate::error::{AppError, AppResult};
 use crate::state::AppState;
-use crate::tray;
+use crate::{notifications, tray};
 use crate::workday::engine::{self, DailySummary, RangeSummary};
 
 fn parse_dt(s: &str) -> AppResult<DateTime<Utc>> {
@@ -75,6 +75,9 @@ fn end_workday_impl(state: &AppState) -> AppResult<WorkDay> {
 pub fn end_workday(app: AppHandle, state: State<'_, AppState>) -> AppResult<WorkDay> {
     let result = end_workday_impl(&state);
     tray::refresh(&app);
+    if result.is_ok() {
+        notifications::workday_ended(&app);
+    }
     result
 }
 
