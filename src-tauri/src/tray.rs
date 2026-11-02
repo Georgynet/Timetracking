@@ -29,6 +29,9 @@ use crate::{notifications, timer, workday};
 const TRAY_ID: &str = "main";
 pub const STATE_CHANGED_EVENT: &str = "tray-state-changed";
 pub const SYNC_FINISHED_EVENT: &str = "tray-sync-finished";
+/// A native menu can't take text input, so "Ticket key…" shows the window and asks the
+/// frontend to focus its start-by-key field (ADR-0040).
+pub const START_BY_KEY_EVENT: &str = "tray-start-by-key";
 const TICK_INTERVAL: Duration = Duration::from_secs(30);
 const MAX_FAVORITES: usize = 15;
 const MAX_RECENT: usize = 5;
@@ -167,6 +170,7 @@ fn workday_status(conn: &Connection, now: DateTime<Utc>) -> AppResult<WorkdaySta
 pub enum TrayAction {
     StartTimer(i64),
     StopTimer,
+    StartByKey,
     StartWorkday,
     EndWorkday,
     StartBreak,
@@ -181,6 +185,7 @@ impl TrayAction {
         match self {
             Self::StartTimer(task_id) => format!("start:{task_id}"),
             Self::StopTimer => "stop".into(),
+            Self::StartByKey => "start-key".into(),
             Self::StartWorkday => "workday:start".into(),
             Self::EndWorkday => "workday:end".into(),
             Self::StartBreak => "break:start".into(),
@@ -194,6 +199,7 @@ impl TrayAction {
     pub fn parse(id: &str) -> Option<Self> {
         Some(match id {
             "stop" => Self::StopTimer,
+            "start-key" => Self::StartByKey,
             "workday:start" => Self::StartWorkday,
             "workday:end" => Self::EndWorkday,
             "break:start" => Self::StartBreak,
@@ -489,6 +495,8 @@ fn build_menu(
     }
     let start_label = if model.running.is_some() { "Switch to" } else { "Start timer" };
     let start = Submenu::new(app, start_label, true)?;
+    start.append(&item(TrayAction::StartByKey, "Ticket key…")?)?;
+    start.append(&separator()?)?;
     for task in &model.favorites {
         start.append(&item(TrayAction::StartTimer(task.id), &task_label(task))?)?;
     }
@@ -550,6 +558,10 @@ fn on_menu_event(app: &AppHandle, event: MenuEvent) {
         TrayAction::Quit => app.exit(0),
         TrayAction::OpenWindow => show_main_window(app),
         TrayAction::Sync => start_sync(app),
+        TrayAction::StartByKey => {
+            show_main_window(app);
+            let _ = app.emit(START_BY_KEY_EVENT, ());
+        }
         _ => {
             match apply(app, action) {
                 Ok(()) if action == TrayAction::EndWorkday => notifications::workday_ended(app),
@@ -587,7 +599,7 @@ fn apply(app: &AppHandle, action: TrayAction) -> AppResult<()> {
         TrayAction::EndBreak => {
             workday::engine::end_break(&conn, now)?;
         }
-        TrayAction::Sync | TrayAction::OpenWindow | TrayAction::Quit => {}
+        TrayAction::StartByKey | TrayAction::Sync | TrayAction::OpenWindow | TrayAction::Quit => {}
     }
     Ok(())
 }
@@ -726,6 +738,7 @@ mod tests {
         let actions = [
             TrayAction::StartTimer(42),
             TrayAction::StopTimer,
+            TrayAction::StartByKey,
             TrayAction::StartWorkday,
             TrayAction::EndWorkday,
             TrayAction::StartBreak,

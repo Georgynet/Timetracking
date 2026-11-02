@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { isTrayAvailable } from "../api/commands";
-import { onTrayStateChanged, onTraySyncFinished } from "../api/events";
+import { onTrayStartByKey, onTrayStateChanged, onTraySyncFinished } from "../api/events";
 import type { SyncReport } from "../api/types";
 import { orderTasks } from "../lib/tasks";
 import { useStore } from "../state/store";
@@ -48,6 +48,10 @@ export function MainView({ onLoggedOut }: { onLoggedOut: () => void }) {
   const [trayAvailable, setTrayAvailable] = useState(true);
   const [syncReport, setSyncReport] = useState<SyncReport | null>(null);
   const [historyRefreshSignal, setHistoryRefreshSignal] = useState(0);
+  // Set by the tray's "Ticket key…" item and cleared by `TimerWidget` once it has
+  // opened its key field — a flag rather than a counter, because the widget remounts
+  // when coming back from Statistics and must not reopen the field every time.
+  const [startByKeyRequested, setStartByKeyRequested] = useState(false);
   const [activeView, setActiveView] = useState<MainViewTab>("tracker");
   const [settingsOpen, setSettingsOpen] = useState(false);
 
@@ -78,6 +82,10 @@ export function MainView({ onLoggedOut }: { onLoggedOut: () => void }) {
         loadUnsyncedCount();
         setSyncReport(report);
         setHistoryRefreshSignal((n) => n + 1);
+      }),
+      onTrayStartByKey(() => {
+        setActiveView("tracker");
+        setStartByKeyRequested(true);
       }),
     ];
     return () => unlisteners.forEach((unlisten) => unlisten.then((fn) => fn()));
@@ -178,6 +186,8 @@ export function MainView({ onLoggedOut }: { onLoggedOut: () => void }) {
             tasks={allTasks}
             onStart={handleStartTimer}
             onStop={handleStopTimer}
+            startByKeyRequested={startByKeyRequested}
+            onStartByKeyHandled={() => setStartByKeyRequested(false)}
           />
           <div className="panels-row">
             {/* Remounts when the saved default arrives or changes, so the toggle
