@@ -235,6 +235,21 @@ label {
 
 .timer-running {
   justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+/* The ticket-key field takes the select's place (or, while running, a row of its own
+   under the timer for switching), with the same share of the leftover room. */
+.timer-key {
+  flex: 2 1 0;
+  min-width: 8em;
+}
+
+.timer-key-row {
+  flex-basis: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.75em;
 }
 
 /* The note takes whatever room the ticket key and elapsed time leave. */

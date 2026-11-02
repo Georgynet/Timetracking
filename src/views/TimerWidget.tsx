@@ -1,19 +1,39 @@
 import { useEffect, useRef, useState } from "react";
-import { updateRunningComment } from "../api/commands";
+import { resolveTaskByKey, updateRunningComment } from "../api/commands";
 import type { ActiveTimer, Task } from "../api/types";
 import { formatElapsed } from "../lib/format";
+import { extractIssueKey } from "../lib/jira";
+
+/** Starting by key is mostly for reviewing someone else's ticket (ADR-0040), so the
+ * comment starts out as this — editable, and dropped again if the form is cancelled. */
+const BY_KEY_COMMENT = "CR";
 
 interface TimerWidgetProps {
   activeTimer: ActiveTimer | null;
   tasks: Task[];
   onStart: (taskId: number, comment?: string) => Promise<void>;
   onStop: () => Promise<void>;
+  /** The tray's "Ticket key…" item was used: open and focus the key field, then ack. */
+  startByKeyRequested: boolean;
+  onStartByKeyHandled: () => void;
 }
 
-export function TimerWidget({ activeTimer, tasks, onStart, onStop }: TimerWidgetProps) {
+export function TimerWidget({
+  activeTimer,
+  tasks,
+  onStart,
+  onStop,
+  startByKeyRequested,
+  onStartByKeyHandled,
+}: TimerWidgetProps) {
   const [now, setNow] = useState(() => Date.now());
   const [selectedTaskId, setSelectedTaskId] = useState<number | "">("");
   const [comment, setComment] = useState("");
+  // Start (or switch to) a ticket by typing its key — for tickets that aren't in My
+  // Tasks/Favorites, typically a review of someone else's work.
+  const [byKey, setByKey] = useState(false);
+  const [keyInput, setKeyInput] = useState("");
+  const keyInputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // The note on the running entry. It lives on the entry itself (as its comment), so
@@ -75,6 +95,87 @@ export function TimerWidget({ activeTimer, tasks, onStart, onStop }: TimerWidget
     }
   }
 
+  function openByKey() {
+    setByKey(true);
+    setComment((c) => (c.trim() ? c : BY_KEY_COMMENT));
+    keyInputRef.current?.focus();
+  }
+
+  function closeByKey() {
+    setByKey(false);
+    setKeyInput("");
+    setComment((c) => (c === BY_KEY_COMMENT ? "" : c));
+  }
+
+  useEffect(() => {
+    if (!startByKeyRequested) return;
+    openByKey();
+    onStartByKeyHandled();
+    // The field may only mount with this render, after which `autoFocus` covers it.
+    requestAnimationFrame(() => keyInputRef.current?.focus());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startByKeyRequested]);
+
+  async function handleStartByKey() {
+    const key = extractIssueKey(keyInput);
+    if (!key) {
+      setError("Enter a ticket key like PROJ-123 or paste a Jira link");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      // Fetches the ticket from Jira (so a typo fails here, not at sync time) and
+      // stores it locally; it then shows up under Recent/Resume in the tray.
+      const task = await resolveTaskByKey(key);
+      // Switching tickets stops the running one, so its note must be saved first.
+      if (activeTimer) await saveNote(note);
+      await onStart(task.id, comment.trim() || undefined);
+      setByKey(false);
+      setKeyInput("");
+      setComment("");
+    } catch (err) {
+      setError(err as string);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const byKeyFields = (
+    <>
+      <input
+        ref={keyInputRef}
+        className="timer-key"
+        type="text"
+        placeholder="PROJ-123 or Jira link"
+        value={keyInput}
+        autoFocus
+        onChange={(e) => setKeyInput(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") handleStartByKey();
+          if (e.key === "Escape") closeByKey();
+        }}
+      />
+      <input
+        className="timer-start-comment"
+        type="text"
+        placeholder="Comment (optional)"
+        value={comment}
+        onChange={(e) => setComment(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") handleStartByKey();
+          if (e.key === "Escape") closeByKey();
+        }}
+      />
+      <button onClick={handleStartByKey} disabled={busy || !keyInput.trim()}>
+        {activeTimer ? "Switch" : "Start"}
+      </button>
+      <button type="button" className="link-button" onClick={closeByKey}>
+        Cancel
+      </button>
+    </>
+  );
+
   async function handleStop() {
     setBusy(true);
     setError(null);
@@ -114,9 +215,24 @@ export function TimerWidget({ activeTimer, tasks, onStart, onStop }: TimerWidget
             if (e.key === "Enter") e.currentTarget.blur();
           }}
         />
+        {!byKey && (
+          <button type="button" className="link-button" onClick={openByKey}>
+            Switch to key…
+          </button>
+        )}
         <button onClick={handleStop} disabled={busy}>
           Stop
         </button>
+        {byKey && <div className="timer-key-row">{byKeyFields}</div>}
+      </section>
+    );
+  }
+
+  if (byKey) {
+    return (
+      <section className="timer-widget">
+        {error && <p className="error">{error}</p>}
+        {byKeyFields}
       </section>
     );
   }
@@ -141,6 +257,9 @@ export function TimerWidget({ activeTimer, tasks, onStart, onStop }: TimerWidget
       />
       <button onClick={handleStart} disabled={busy || selectedTaskId === ""}>
         Start
+      </button>
+      <button type="button" className="link-button" onClick={openByKey}>
+        By key…
       </button>
     </section>
   );

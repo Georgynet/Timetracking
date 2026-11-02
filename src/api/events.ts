@@ -10,3 +10,8 @@ export const onTrayStateChanged = (handler: () => void): Promise<UnlistenFn> =>
 /** Fired when a sync started from the tray finishes, with the same report `syncAll` returns. */
 export const onTraySyncFinished = (handler: (report: SyncReport) => void): Promise<UnlistenFn> =>
   listen<SyncReport>("tray-sync-finished", (event) => handler(event.payload));
+
+/** Fired by the tray's "Ticket key…" item: the window is shown and should focus the
+ * start-by-key field (a native menu can't take text input itself). */
+export const onTrayStartByKey = (handler: () => void): Promise<UnlistenFn> =>
+  listen("tray-start-by-key", () => handler());

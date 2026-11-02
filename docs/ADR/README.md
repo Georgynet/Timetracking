@@ -49,3 +49,4 @@ it instead, so the history of *why* stays intact.
 | [0037](0037-macos-menu-bar-extras.md) | macOS menu bar extras — title, state icons, left click, close-to-tray | Accepted |
 | [0038](0038-macos-notifications-and-reminders.md) | macOS notifications — action results and configurable reminders | Accepted |
 | [0039](0039-note-on-the-running-timer.md) | A note on the running timer, saved as the entry's comment while typing | Accepted |
+| [0040](0040-start-timer-by-ticket-key.md) | Start the timer by ticket key, from the window and the tray | Accepted |
